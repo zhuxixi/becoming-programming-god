@@ -2,7 +2,7 @@ package org.zhuzhenxi.becoming.basic.java.file;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import org.zhuzhenxi.becoming.random.RandomUtil;
+import org.zhuzhenxi.becoming.basic.java.random.RandomUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;

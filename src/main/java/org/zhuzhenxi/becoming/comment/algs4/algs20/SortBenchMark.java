@@ -1,6 +1,6 @@
 package org.zhuzhenxi.becoming.comment.algs4.algs20;
 
-import org.zhuzhenxi.becoming.random.RandomUtil;
+import org.zhuzhenxi.becoming.basic.java.random.RandomUtil;
 
 import java.util.Arrays;
 

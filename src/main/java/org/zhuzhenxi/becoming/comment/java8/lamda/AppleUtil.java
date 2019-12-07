@@ -1,4 +1,4 @@
-package org.zhuzhenxi.becoming.lamda;
+package org.zhuzhenxi.becoming.comment.java8.lamda;
 
 import java.util.ArrayList;
 import java.util.List;

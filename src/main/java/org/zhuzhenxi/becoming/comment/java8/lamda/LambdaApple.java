@@ -1,4 +1,4 @@
-package org.zhuzhenxi.becoming.lamda;
+package org.zhuzhenxi.becoming.comment.java8.lamda;
 
 import java.util.Arrays;
 import java.util.Comparator;

@@ -1,4 +1,4 @@
-package org.zhuzhenxi.becoming.random;
+package org.zhuzhenxi.becoming.basic.java.random;
 
 import java.util.Random;
 
