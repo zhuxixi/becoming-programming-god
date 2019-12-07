@@ -10,14 +10,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @date 2018.05.02
  */
 @SpringBootApplication
-@EnableMethodCache(basePackages = "org.zhuzhenxi.test")
+@EnableMethodCache(basePackages = "org.zhuzhenxi.becoming")
 @EnableCreateCacheAnnotation
 public class TestApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(TestApplication.class, args);
 	}
-
-
 
 }
