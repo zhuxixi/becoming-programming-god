@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.zhuzhenxi.becoming.source.jetcache.service.TestCacheService;
-import org.zhuzhenxi.becoming.spring.SpringUtil;
+import org.zhuzhenxi.becoming.basic.java.spring.SpringUtil;
 
 import java.util.List;
 
