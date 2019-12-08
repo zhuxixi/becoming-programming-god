@@ -38,8 +38,22 @@ HashMap要保存的数据量和load factor应该在map初始化时就要去考�
 HashMap是 Java 集合框架的成员之一。
 
 ## 构造器
+### public HashMap(int initialCapacity,float loadFactor)
+使用指定的capacity和负载因子来构造一个空的hashMap。
 
-## 方法
+Throws:
+IllegalArgumentException  如果capacity和负载因子是负数
+
+### public HashMap(int initialCapacity)
+使用指定的capacity和默认的0.75负载因子来构造一个空的hashMap。
+Throws:
+IllegalArgumentException - 如果capacity是负数.
+### public HashMap()
+使用默认的capacity=16和load factor=0.75来构造一个hashmap
+### public HashMap(Map<? extends K,? extends V> m)
+使用的capacity足够装下m的元素和load factor=0.75来构造一个hashmap
+Throws:
+NullPointerException - 如果m为null
 
 ## 源码解析
 
