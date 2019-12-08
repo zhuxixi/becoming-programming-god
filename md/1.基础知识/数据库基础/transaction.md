@@ -1,4 +1,5 @@
-<script type="text/javascript" src="../../js/flowchart.js"></script>
+<script src="//cdn.bootcss.com/raphael/2.2.0/raphael-min.js"></script>
+<script src="//cdn.bootcss.com/flowchart/1.6.3/flowchart.js"></script>
 # 什么是事务
 事务（Transaction）是并发控制的基本单位。所谓的事务，它是一个操作序列，
 这些操作要么都执行，要么都不执行，它是一个不可分割的工作单位。例如，银行转账工作：
