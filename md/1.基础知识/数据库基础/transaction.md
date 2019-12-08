@@ -45,7 +45,8 @@ mysql> start transaction;
 Query OK, 0 rows affected (0.00 sec)
 ```
 
-### 更新id为3的行的balance值为3000.00
+### 在事务中做一些更新和插入操作
+更新id为3的行的balance值为3000.00
 ```
 mysql> update bank set balance = 3000 where id = 3;
 Query OK, 1 row affected (0.09 sec)
@@ -78,5 +79,37 @@ mysql> select * from bank;
 由于以上的update和insert操作都是在start transaction命令开启事务之后，
 所以直到事务结束，这些操作都属于同一事务，假设我们在insert操作时产生了错误，
 可以根据事务的定义得知，这些属于同一事务的所有操作要么都执行要么都不执行，
-我们可以验证一下，使用rollback命令，模拟事务失败回滚，
+我们可以验证一下，使用rollback命令，模拟事务失败回滚。
+### 使用rollback回滚
+```
+mysql> rollback;
+Query OK, 0 rows affected (0.01 sec)
+```
+### 再查询验证数据无变化
+此时我们在查询数据库中的所有数据，发现数据恢复到了update命令执行前的状态，
+id为3的行的balance值等于2000没有变化。
+```
+mysql> select * from bank;
++----+------+---------+
+| id | name | balance |
++----+------+---------+
+|  3 | fufu | 2000.00 |
++----+------+---------+
+1 row in set (0.00 sec)
+```
 
+### 小结
+到此，我们阐述了数据库事务的定义并用简单的Mysql操作说明了事务的操作
+方式，我们可以总结出数据库事务的生命周期如下：
+```flow
+st=>start: Start
+e=>end: End
+op1=>operation: My Operation
+sub1=>subroutine: My Subroutine
+cond=>condition: Yes or No?
+io=>inputoutput: catch something...
+
+st->op1->cond
+cond(yes)->io->e
+cond(no)->sub1(right)->op1
+```
