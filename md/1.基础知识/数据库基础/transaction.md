@@ -1,3 +1,4 @@
+<script type="text/javascript" src="../../js/flowchart.js"></script>
 # 什么是事务
 事务（Transaction）是并发控制的基本单位。所谓的事务，它是一个操作序列，
 这些操作要么都执行，要么都不执行，它是一个不可分割的工作单位。例如，银行转账工作：
@@ -101,15 +102,15 @@ mysql> select * from bank;
 ### 小结
 到此，我们阐述了数据库事务的定义并用简单的Mysql操作说明了事务的操作
 方式，我们可以总结出数据库事务的生命周期如下：
+
 ```flow
 st=>start: Start
-e=>end: End
-op1=>operation: My Operation
-sub1=>subroutine: My Subroutine
+op=>operation: Your Operation
 cond=>condition: Yes or No?
-io=>inputoutput: catch something...
+e=>end
 
-st->op1->cond
-cond(yes)->io->e
-cond(no)->sub1(right)->op1
+st->op->cond
+cond(yes)->e
+cond(no)->op
 ```
+
