@@ -35,7 +35,7 @@
 ### 3.4 Java8实战(java8)
 ### 3.5 深入剖析Tomcat
 ### 3.6 Mysql技术内幕
-### 3.7 高性能mysql
+### 3.7 高性能mysqlss
 ### 3.8 Kafka权威指南
 ### 3.9 Http权威指南
 ### 3.10 Java8实战
