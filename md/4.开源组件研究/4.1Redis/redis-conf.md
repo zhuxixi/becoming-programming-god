@@ -1,117 +1,99 @@
 # Redis配置文件详解
+## 1. 常规命令
 
-1. 启动redis并使配置文件生效需要使用以下命令：
- `./redis-server /path/to/redis.conf`
+### 1.1 `./redis-server /path/to/redis.conf`
 
-2. include 可以使用多个配置文件，如果配置文件有相同值，后面的会覆盖前面的
+启动redis并使配置文件生效
 
+### 1.2 `include /path/to/local.conf` 
+include 可以使用多个配置文件，如果配置文件有相同值，后面的会覆盖前面的:  
 ```
 include /path/to/local.conf
 include /path/to/other.conf
 ```
+### 1.3 `loadmodule /path/to/my_module.so`
 
-3. 加载modules 没什么用好像
+加载modules 没什么用好像
 ```
 loadmodule /path/to/my_module.so
 loadmodule /path/to/other_module.so
 ```
 
-4. 绑定ip地址，为了安全最好都绑定
+### 1.4 `bind 127.0.0.1`
+绑定ip地址，为了安全最好都绑定
+
+### 1.5 `protected-mode yes`
+保护模式，如果保护模式开了，而且redis既没有bind ip，也没设置密码，那redis只接收127.0.0.1的连接。
+**默认都开**
+
+### 1.6 `port 6379`
+端口，设置为0就不会监听
+
+### 1.7 `tcp-backlog 511` 
+linux 内核tcp_max_syn_backlog和somaxconn 参数调优 
+### 1.8 `unixsocket /tmp/redis.sock unixsocketperm 700`
+unix socket ，默认不监听，没用
+### 1.9 `timeout 0`
+连接闲置N秒时关闭连接
+### 1.10 `tcp-keepalive 300`
+开启TCP长连接，如果设置非0，会使用系统的SO_KEEPALIVE间隔发送TCP ACK给客户端，以防连接被弃用。这个很有用：  
+* 检测死掉的连接。
+* 如果网络之间还有其他的网络设备，可以连接保活
+注意，如果想依靠这个机制关闭连接，可能需要两倍的时间，主要取决于kernel的配置
+默认值是300。
+
+## 2. 标准配置
+
+### 2.1 `daemonize yes`
+默认情况redis不会按照守护进程的模式去运行。如果你需要，可以设置来开启
+注意，如果开启守护进程模式，会生成`/var/run/redis.pid`保存pid
+
+### 2.2 `supervised no` 
+
 ```
-bind 127.0.0.1
+ If you run Redis from upstart or systemd, Redis can interact with your
+ supervision tree. Options:
+   supervised no      - no supervision interaction
+   supervised upstart - signal upstart by putting Redis into SIGSTOP mode
+   supervised systemd - signal systemd by writing READY=1 to $NOTIFY_SOCKET
+   supervised auto    - detect upstart or systemd method based on
+                        UPSTART_JOB or NOTIFY_SOCKET environment variables
+ Note: these supervision methods only signal "process is ready."
+       They do not enable continuous liveness pings back to your supervisor.
 ```
-5. 保护模式，如果保护模式开了，而且redis既没有bind ip，也没设置密码，那redis只接收127.0.0.1的连接
-默认都开
-`protected-mode yes`
+### 2.3 `pidfile /var/run/redis_6379.pid`
+pid文件路径 ，默认值`/var/run/redis.pid`
+如果在非守护进程模式下，而且也没配置pidfile路径，那么不会生成pid文件。如果是守护进程模式，
+pidfile总会生成，没配置pidfile就会用默认路径。
+### 2.4 `loglevel notice`
+指定服务的日志级别：
+* debug
+* verbose
+* notice
+* warning
+默认 notice
+### 2.5 `logfile ""`
+指定redis日志文件名称和路径。你也可以设置`logfile ""`强制redis将日志输出的标准输出。
+注意，如果你使用标准输出，而且redis使用守护进程模式运行，那log日志会被发送给/dev/null，就没了
+`logfile ""`
+16. `syslog-enabled no`
+```
+To enable logging to the system logger, just set 'syslog-enabled' to yes,
+and optionally update the other syslog parameters to suit your needs.
+```
+17. `syslog-ident redis` Specify the syslog identity.
 
-6. 端口 `port 6379` 设置为0就不会监听
+18. `syslog-facility local0` Specify the syslog facility. Must be USER or between LOCAL0-LOCAL7.
 
-7. linux 内核tcp_max_syn_backlog和somaxconn 参数调优 `tcp-backlog 511`
-8. unix socket `unixsocket /tmp/redis.sock unixsocketperm 700`，默认不监听，没用
-9. 连接闲置N秒时关闭连接`timeout 0`
-10. 
-
-
-# TCP keepalive.
-#
-# If non-zero, use SO_KEEPALIVE to send TCP ACKs to clients in absence
-# of communication. This is useful for two reasons:
-#
-# 1) Detect dead peers.
-# 2) Take the connection alive from the point of view of network
-#    equipment in the middle.
-#
-# On Linux, the specified value (in seconds) is the period used to send ACKs.
-# Note that to close the connection the double of the time is needed.
-# On other kernels the period depends on the kernel configuration.
-#
-# A reasonable value for this option is 300 seconds, which is the new
-# Redis default starting with Redis 3.2.1.
-tcp-keepalive 300
-
-################################# GENERAL #####################################
-
-# By default Redis does not run as a daemon. Use 'yes' if you need it.
-# Note that Redis will write a pid file in /var/run/redis.pid when daemonized.
-daemonize no
-
-# If you run Redis from upstart or systemd, Redis can interact with your
-# supervision tree. Options:
-#   supervised no      - no supervision interaction
-#   supervised upstart - signal upstart by putting Redis into SIGSTOP mode
-#   supervised systemd - signal systemd by writing READY=1 to $NOTIFY_SOCKET
-#   supervised auto    - detect upstart or systemd method based on
-#                        UPSTART_JOB or NOTIFY_SOCKET environment variables
-# Note: these supervision methods only signal "process is ready."
-#       They do not enable continuous liveness pings back to your supervisor.
-supervised no
-
-# If a pid file is specified, Redis writes it where specified at startup
-# and removes it at exit.
-#
-# When the server runs non daemonized, no pid file is created if none is
-# specified in the configuration. When the server is daemonized, the pid file
-# is used even if not specified, defaulting to "/var/run/redis.pid".
-#
-# Creating a pid file is best effort: if Redis is not able to create it
-# nothing bad happens, the server will start and run normally.
-pidfile /var/run/redis_6379.pid
-
-# Specify the server verbosity level.
-# This can be one of:
-# debug (a lot of information, useful for development/testing)
-# verbose (many rarely useful info, but not a mess like the debug level)
-# notice (moderately verbose, what you want in production probably)
-# warning (only very important / critical messages are logged)
-loglevel notice
-
-# Specify the log file name. Also the empty string can be used to force
-# Redis to log on the standard output. Note that if you use standard
-# output for logging but daemonize, logs will be sent to /dev/null
-logfile ""
-
-# To enable logging to the system logger, just set 'syslog-enabled' to yes,
-# and optionally update the other syslog parameters to suit your needs.
-# syslog-enabled no
-
-# Specify the syslog identity.
-# syslog-ident redis
-
-# Specify the syslog facility. Must be USER or between LOCAL0-LOCAL7.
-# syslog-facility local0
-
+19. databases 16
+```
+使用集群模式时，database就是0
 # Set the number of databases. The default database is DB 0, you can select
 # a different one on a per-connection basis using SELECT <dbid> where
 # dbid is a number between 0 and 'databases'-1
-databases 16
+```
+20. 搞笑配置，永远显示redis的logo `always-show-logo yes`
 
-# By default Redis shows an ASCII art logo only when started to log to the
-# standard output and if the standard output is a TTY. Basically this means
-# that normally a logo is displayed only in interactive sessions.
-#
-# However it is possible to force the pre-4.0 behavior and always show a
-# ASCII art logo in startup logs by setting the following option to yes.
-always-show-logo yes
 
 ################################ SNAPSHOTTING  ################################
 #
@@ -135,54 +117,28 @@ always-show-logo yes
 #
 #   save ""
 
+21. 以下开启RDB
+```
 save 900 1
 save 300 10
 save 60 10000
 
-# By default Redis will stop accepting writes if RDB snapshots are enabled
-# (at least one save point) and the latest background save failed.
-# This will make the user aware (in a hard way) that data is not persisting
-# on disk properly, otherwise chances are that no one will notice and some
-# disaster will happen.
-#
-# If the background saving process will start working again Redis will
-# automatically allow writes again.
-#
-# However if you have setup your proper monitoring of the Redis server
-# and persistence, you may want to disable this feature so that Redis will
-# continue to work as usual even if there are problems with disk,
-# permissions, and so forth.
-stop-writes-on-bgsave-error yes
 
-# Compress string objects using LZF when dump .rdb databases?
-# For default that's set to 'yes' as it's almost always a win.
-# If you want to save some CPU in the saving child set it to 'no' but
-# the dataset will likely be bigger if you have compressible values or keys.
-rdbcompression yes
+```
+22. 默认情况下，如果RDB快照功能开启而且最后一次rdb快照save失败时，redis会停止接收写请求
+这其实就是一种强硬的方式来告知用户数据持久化不正常，否则没有人会知道当前系统出大问题了。
+如果后台save进程正常工作了(正常保存了rdb文件)，那么redis会自动的允许写请求。
+不过如果你已经设置了一些监控到redis服务器，你可能想要禁用这个功能，这样redis在磁盘出问题时依旧
+可以继续处理写请求。只要set `stop-writes-on-bgsave-error yes`
+23. 使用LZF算法对rdb文件进行压缩，如果要节省一些CPU，可以设置为no。`rdbcompression yes`
 
-# Since version 5 of RDB a CRC64 checksum is placed at the end of the file.
-# This makes the format more resistant to corruption but there is a performance
-# hit to pay (around 10%) when saving and loading RDB files, so you can disable it
-# for maximum performances.
-#
-# RDB files created with checksum disabled have a checksum of zero that will
-# tell the loading code to skip the check.
-rdbchecksum yes
-
-# The filename where to dump the DB
-dbfilename dump.rdb
-
-# The working directory.
-#
-# The DB will be written inside this directory, with the filename specified
-# above using the 'dbfilename' configuration directive.
-#
-# The Append Only File will also be created inside this directory.
-#
-# Note that you must specify a directory here, not a file name.
-dir ./
-
-################################# REPLICATION #################################
+24. 自从redis 5.0，rdb文件的末尾会设置一个CRC64校验码(循环冗余码)。这可以起到一定的的纠错作用，但是也要
+付出10%的性能损失，你可以关闭这个功能来获取最大的性能。
+如果rdb文件校验功能关闭，那么系统读取不到检验码时会自动跳过校验。
+`rdbchecksum yes`
+25. rdb文件名 `dbfilename dump.rdb`
+26. 工作目录 `dir ./`，rdb文件会创建在这个目录下，aof文件也一样。
+27. 主从复制
 
 # Master-Slave replication. Use slaveof to make a Redis instance a copy of
 # another Redis server. A few things to understand ASAP about Redis replication.
