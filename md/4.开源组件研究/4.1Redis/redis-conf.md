@@ -76,182 +76,102 @@ pidfile总会生成，没配置pidfile就会用默认路径。
 指定redis日志文件名称和路径。你也可以设置`logfile ""`强制redis将日志输出的标准输出。
 注意，如果你使用标准输出，而且redis使用守护进程模式运行，那log日志会被发送给/dev/null，就没了
 `logfile ""`
-16. `syslog-enabled no`
+### 2.6 `syslog-enabled no`
 ```
 To enable logging to the system logger, just set 'syslog-enabled' to yes,
 and optionally update the other syslog parameters to suit your needs.
 ```
-17. `syslog-ident redis` Specify the syslog identity.
+### 2.7 `syslog-ident redis` 
+Specify the syslog identity.
 
-18. `syslog-facility local0` Specify the syslog facility. Must be USER or between LOCAL0-LOCAL7.
+### 2.8 `syslog-facility local0`
+Specify the syslog facility. Must be USER or between LOCAL0-LOCAL7.
 
-19. databases 16
+### 2.9 `databases 16`
 ```
 使用集群模式时，database就是0
-# Set the number of databases. The default database is DB 0, you can select
-# a different one on a per-connection basis using SELECT <dbid> where
-# dbid is a number between 0 and 'databases'-1
+设置数据库的数量。redis默认的数据库就是0，你可以选择不同的数据库，在一个redis连接中
+执行selcet <dbid> ，dbid可选的范围是0~(databases-1)，默认就是0~15
 ```
-20. 搞笑配置，永远显示redis的logo `always-show-logo yes`
+### 2.10 `always-show-logo yes`
+搞笑配置，永远显示redis的logo
 
+## 3. 快照相关
 
-################################ SNAPSHOTTING  ################################
-#
-# Save the DB on disk:
-#
-#   save <seconds> <changes>
-#
-#   Will save the DB if both the given number of seconds and the given
-#   number of write operations against the DB occurred.
-#
-#   In the example below the behaviour will be to save:
-#   after 900 sec (15 min) if at least 1 key changed
-#   after 300 sec (5 min) if at least 10 keys changed
-#   after 60 sec if at least 10000 keys changed
-#
-#   Note: you can disable saving completely by commenting out all "save" lines.
-#
-#   It is also possible to remove all the previously configured save
-#   points by adding a save directive with a single empty string argument
-#   like in the following example:
-#
-#   save ""
-
-21. 以下开启RDB
+### 3.1 `save 900 1`
+开启RDB持久化。  
+save <seconds> <changes> ，save 900 1，就是900秒有一次更改就做一次rdb快照到磁盘。
+禁用rdb就是注释掉save行，如果你配置了`save ""`，也可以禁用rdb
+下面是默认值
 ```
 save 900 1
 save 300 10
 save 60 10000
-
-
 ```
-22. 默认情况下，如果RDB快照功能开启而且最后一次rdb快照save失败时，redis会停止接收写请求
+### 3.2 `stop-writes-on-bgsave-error yes`
+默认情况下，如果RDB快照功能开启而且最后一次rdb快照save失败时，redis会停止接收写请求
 这其实就是一种强硬的方式来告知用户数据持久化不正常，否则没有人会知道当前系统出大问题了。
 如果后台save进程正常工作了(正常保存了rdb文件)，那么redis会自动的允许写请求。
 不过如果你已经设置了一些监控到redis服务器，你可能想要禁用这个功能，这样redis在磁盘出问题时依旧
 可以继续处理写请求。只要set `stop-writes-on-bgsave-error yes`
-23. 使用LZF算法对rdb文件进行压缩，如果要节省一些CPU，可以设置为no。`rdbcompression yes`
-
-24. 自从redis 5.0，rdb文件的末尾会设置一个CRC64校验码(循环冗余码)。这可以起到一定的的纠错作用，但是也要
+### 3.3 `rdbcompression yes`
+使用LZF算法对rdb文件进行压缩，如果要节省一些CPU，可以设置为no。
+### 3.4 `rdbchecksum yes`
+自从redis 5.0，rdb文件的末尾会设置一个CRC64校验码(循环冗余码)。这可以起到一定的的纠错作用，但是也要
 付出10%的性能损失，你可以关闭这个功能来获取最大的性能。
 如果rdb文件校验功能关闭，那么系统读取不到检验码时会自动跳过校验。
 `rdbchecksum yes`
-25. rdb文件名 `dbfilename dump.rdb`
-26. 工作目录 `dir ./`，rdb文件会创建在这个目录下，aof文件也一样。
-27. 主从复制
+### 3.5  `dbfilename dump.rdb`
+rdb文件名
+### 3.6 `dir ./`
+工作目录 ，rdb文件会创建在这个目录下，aof文件也一样。
+### 3.7 `slaveof <masterip> <masterport>`
+主从复制。使用slaveof配置将redis实例变为其他redis服务器的一个拷贝。
+* redis的主从复制时异步的，但是当主节点无法连接到给定数量的从节点时，你可以设置主节点停止处理写请求
+* 如果主从复制断了一小段时间，redis从节点可以执行一次局部的重新同步，你可能需要设置
+	复制的backlog size
+* 主从复制时自动的无需用户干预。如果网络中间断了，从节点会自动重连主节点，并发起一次重新同步。
+### 3.8 `masterauth <master-password>`
+如果主节点有密码，从节点必须配置这个密码，否则主节点拒绝复制请求。
+### 3.9 `slave-serve-stale-data yes`
+当主从同步失败时，从节点有两种行为：
+* 配置为yes，从节点可以继续响应客户端的请求。
+* 配置为no，从节点直接报错"SYNC with master in progress"，不过INFO和SALVEOF命令是可以执行的。
+### 3.10 `slave-read-only yes`
+你可以设置从节点能够处理写请求。向从节点写入一些临时数据有时候是有用的(因为数据在resync后很快
+就会删除)，如果配错了也可能会造成一些问题。
+2.6版本以后默认都是read-only
+read-only不是设计成对抗那些不可信的客户端的。只是怕客户端用错命令。read-only模式下一些管理类命令
+还是会输出的。如果要限制这种命令，你可以使用rename-command来重命名那些管理类命令
 
-# Master-Slave replication. Use slaveof to make a Redis instance a copy of
-# another Redis server. A few things to understand ASAP about Redis replication.
-#
-# 1) Redis replication is asynchronous, but you can configure a master to
-#    stop accepting writes if it appears to be not connected with at least
-#    a given number of slaves.
-# 2) Redis slaves are able to perform a partial resynchronization with the
-#    master if the replication link is lost for a relatively small amount of
-#    time. You may want to configure the replication backlog size (see the next
-#    sections of this file) with a sensible value depending on your needs.
-# 3) Replication is automatic and does not need user intervention. After a
-#    network partition slaves automatically try to reconnect to masters
-#    and resynchronize with them.
-#
-# slaveof <masterip> <masterport>
+### 3.11 `repl-diskless-sync no`
+主从同步策略：disk或socket。
 
-# If the master is password protected (using the "requirepass" configuration
-# directive below) it is possible to tell the slave to authenticate before
-# starting the replication synchronization process, otherwise the master will
-# refuse the slave request.
-#
-# masterauth <master-password>
+警告：diskless复制目前只是试验阶段
+当出现新的从节点或重连的从节点无法进行增量同步时，就需要做一次全量同步(full synchronization)。
+一个RDB文件会从主节点传输到从节点，传输方式有两种：
+* disk-backed：主节点创建一个新的进程将RDB文件写到磁盘。然后这个文件会被主进程逐步传送给多个从节点
+* diskless:主节点创建一个新的进程，直接将RDB文件写给从节点的socket连接，从头到尾不会碰磁盘。
 
-# When a slave loses its connection with the master, or when the replication
-# is still in progress, the slave can act in two different ways:
-#
-# 1) if slave-serve-stale-data is set to 'yes' (the default) the slave will
-#    still reply to client requests, possibly with out of date data, or the
-#    data set may just be empty if this is the first synchronization.
-#
-# 2) if slave-serve-stale-data is set to 'no' the slave will reply with
-#    an error "SYNC with master in progress" to all the kind of commands
-#    but to INFO and SLAVEOF.
-#
-slave-serve-stale-data yes
+使用disk-backed复制，在rdb文件生成完毕后，主节点会为每个从节点创建队列来传说RDB文件，直到传输结束。
+使用diskless复制，一旦开始传输rdb，当时有多少从节点建立连接，就只能并行传输多少从节点，如果此时有新的从节点发起全量同步，就只能等之前的都传完。
+如果使用diskless复制，主节点会在传输之前等待一小段时间(这个时间可以配置)，这样可以让多个从节点到达
+，并做并行传输。
+如果磁盘贼慢，网络带宽特别好，diskless复制策略效果会更好一些。
+### 3.12 `repl-diskless-sync-delay 5`
+如果开启了diskless复制，需要配置一个延迟时间，让主节点等待所有从节点都到达。
+这是非常重要的，因为一旦开始传输，主节点就无法响应新的从节点的全量复制请求，只能先到队列中等待下一次RDB传输，所以主节点需要等待一段时间，让所有从节点全量复制都到达。
+这个延迟时间的单位是秒，默认是5秒。关闭这个特性可以将其设置成0，这样传输总是最快开始。
+### 3.13 `repl-ping-slave-period 10`
+从节点在一定间隔时间发送ping到主节点。默认是是10秒。
+### 3.14 `repl-timeout 60`
+这个值对三个场景都有效：
+1. 大量的I/O操作，从节点收到主节点的响应时间。
+2. 从节点认为主节点的超时时间
+3. 主节点认为从节点的超时时间
 
-# You can configure a slave instance to accept writes or not. Writing against
-# a slave instance may be useful to store some ephemeral data (because data
-# written on a slave will be easily deleted after resync with the master) but
-# may also cause problems if clients are writing to it because of a
-# misconfiguration.
-#
-# Since Redis 2.6 by default slaves are read-only.
-#
-# Note: read only slaves are not designed to be exposed to untrusted clients
-# on the internet. It's just a protection layer against misuse of the instance.
-# Still a read only slave exports by default all the administrative commands
-# such as CONFIG, DEBUG, and so forth. To a limited extent you can improve
-# security of read only slaves using 'rename-command' to shadow all the
-# administrative / dangerous commands.
-slave-read-only yes
-
-# Replication SYNC strategy: disk or socket.
-#
-# -------------------------------------------------------
-# WARNING: DISKLESS REPLICATION IS EXPERIMENTAL CURRENTLY
-# -------------------------------------------------------
-#
-# New slaves and reconnecting slaves that are not able to continue the replication
-# process just receiving differences, need to do what is called a "full
-# synchronization". An RDB file is transmitted from the master to the slaves.
-# The transmission can happen in two different ways:
-#
-# 1) Disk-backed: The Redis master creates a new process that writes the RDB
-#                 file on disk. Later the file is transferred by the parent
-#                 process to the slaves incrementally.
-# 2) Diskless: The Redis master creates a new process that directly writes the
-#              RDB file to slave sockets, without touching the disk at all.
-#
-# With disk-backed replication, while the RDB file is generated, more slaves
-# can be queued and served with the RDB file as soon as the current child producing
-# the RDB file finishes its work. With diskless replication instead once
-# the transfer starts, new slaves arriving will be queued and a new transfer
-# will start when the current one terminates.
-#
-# When diskless replication is used, the master waits a configurable amount of
-# time (in seconds) before starting the transfer in the hope that multiple slaves
-# will arrive and the transfer can be parallelized.
-#
-# With slow disks and fast (large bandwidth) networks, diskless replication
-# works better.
-repl-diskless-sync no
-
-# When diskless replication is enabled, it is possible to configure the delay
-# the server waits in order to spawn the child that transfers the RDB via socket
-# to the slaves.
-#
-# This is important since once the transfer starts, it is not possible to serve
-# new slaves arriving, that will be queued for the next RDB transfer, so the server
-# waits a delay in order to let more slaves arrive.
-#
-# The delay is specified in seconds, and by default is 5 seconds. To disable
-# it entirely just set it to 0 seconds and the transfer will start ASAP.
-repl-diskless-sync-delay 5
-
-# Slaves send PINGs to server in a predefined interval. It's possible to change
-# this interval with the repl_ping_slave_period option. The default value is 10
-# seconds.
-#
-# repl-ping-slave-period 10
-
-# The following option sets the replication timeout for:
-#
-# 1) Bulk transfer I/O during SYNC, from the point of view of slave.
-# 2) Master timeout from the point of view of slaves (data, pings).
-# 3) Slave timeout from the point of view of masters (REPLCONF ACK pings).
-#
-# It is important to make sure that this value is greater than the value
-# specified for repl-ping-slave-period otherwise a timeout will be detected
-# every time there is low traffic between the master and the slave.
-#
-# repl-timeout 60
+注意，这个值一定要设置的比`repl-ping-slave-period`大，否则每次心跳检测都超时
+### 3.15 `repl-disable-tcp-nodelay no`
 
 # Disable TCP_NODELAY on the slave socket after SYNC?
 #
