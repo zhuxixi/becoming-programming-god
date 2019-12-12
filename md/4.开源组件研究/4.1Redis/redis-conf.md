@@ -172,91 +172,33 @@ read-only不是设计成对抗那些不可信的客户端的。只是怕客户�
 
 注意，这个值一定要设置的比`repl-ping-slave-period`大，否则每次心跳检测都超时
 ### 3.15 `repl-disable-tcp-nodelay no`
+在从节点socket 发起SYNC同步后是否需要关闭TCP_NODELAY？
+如果选择YES，redis会使用较小的tcp packet和较小的带宽去发送数据到从节点。但是这会让主从复制增加部分延迟，差不多40毫秒，取决于linux kernel配置。
+如果选择no，主从复制延迟会稍微减少，但是会消耗更大的网络带宽。
+默认我们倾向于低延迟，但是如果网络状况不好的情况时将这个选项置为yes或许是个好方案。
+### 3.16 `repl-backlog-size 1mb`
+设置主从复制backlog大小。backlog是一个缓冲区。
+当主从不同步时，主节点缓存主从复制数据到backlog缓冲区中，当从节点重新连接到主节点时，从节点可以从缓冲区中拿到增量同步数据，并进行增量同步(partitial synchronization)。
+backlog越大，允许从节点断线的时间就越长。backlog缓冲区只有在最少有一个从节点连接时才会创建。
+### 3.17 `repl-backlog-ttl 3600`
+如果主节点再也没有连接到从节点，那个从节点的backlog会被释放。
+当从节点断线开始，这个配置的时间就开始计时了。
 
-# Disable TCP_NODELAY on the slave socket after SYNC?
-#
-# If you select "yes" Redis will use a smaller number of TCP packets and
-# less bandwidth to send data to slaves. But this can add a delay for
-# the data to appear on the slave side, up to 40 milliseconds with
-# Linux kernels using a default configuration.
-#
-# If you select "no" the delay for data to appear on the slave side will
-# be reduced but more bandwidth will be used for replication.
-#
-# By default we optimize for low latency, but in very high traffic conditions
-# or when the master and slaves are many hops away, turning this to "yes" may
-# be a good idea.
-repl-disable-tcp-nodelay no
+### 3.18 `slave-priority 100`
+这个配置是给哨兵模式用的，当主节点挂掉时，哨兵会选取一个priority最小的从节点去升主，如果某个redis节点的这个值配成0，那么这个节点永远都不会被升为主节点。默认值就是100。
 
-# Set the replication backlog size. The backlog is a buffer that accumulates
-# slave data when slaves are disconnected for some time, so that when a slave
-# wants to reconnect again, often a full resync is not needed, but a partial
-# resync is enough, just passing the portion of data the slave missed while
-# disconnected.
-#
-# The bigger the replication backlog, the longer the time the slave can be
-# disconnected and later be able to perform a partial resynchronization.
-#
-# The backlog is only allocated once there is at least a slave connected.
-#
-# repl-backlog-size 1mb
+### 3.19 `min-slaves-to-write 3和min-slaves-max-lag 10`
+如果lag秒内主节点在线的从节点少于N个，主节点停止接收写请求。
+例如10秒内最少3个从节点在线时，主节点才接受写请求，可以用如下配置：
+```
+min-slaves-to-write 3
+min-slaves-max-lag 10
+```
+将这两个配置任意一个设置为0，就禁用此功能。默认是禁用的。
+### 3.20 ``
+有多种方式可以显示主节点当前在线的从节点的ip和端口。
+例如，info replication 部分，或者在主节点执行ROLE命令。
 
-# After a master has no longer connected slaves for some time, the backlog
-# will be freed. The following option configures the amount of seconds that
-# need to elapse, starting from the time the last slave disconnected, for
-# the backlog buffer to be freed.
-#
-# Note that slaves never free the backlog for timeout, since they may be
-# promoted to masters later, and should be able to correctly "partially
-# resynchronize" with the slaves: hence they should always accumulate backlog.
-#
-# A value of 0 means to never release the backlog.
-#
-# repl-backlog-ttl 3600
-
-# The slave priority is an integer number published by Redis in the INFO output.
-# It is used by Redis Sentinel in order to select a slave to promote into a
-# master if the master is no longer working correctly.
-#
-# A slave with a low priority number is considered better for promotion, so
-# for instance if there are three slaves with priority 10, 100, 25 Sentinel will
-# pick the one with priority 10, that is the lowest.
-#
-# However a special priority of 0 marks the slave as not able to perform the
-# role of master, so a slave with priority of 0 will never be selected by
-# Redis Sentinel for promotion.
-#
-# By default the priority is 100.
-slave-priority 100
-
-# It is possible for a master to stop accepting writes if there are less than
-# N slaves connected, having a lag less or equal than M seconds.
-#
-# The N slaves need to be in "online" state.
-#
-# The lag in seconds, that must be <= the specified value, is calculated from
-# the last ping received from the slave, that is usually sent every second.
-#
-# This option does not GUARANTEE that N replicas will accept the write, but
-# will limit the window of exposure for lost writes in case not enough slaves
-# are available, to the specified number of seconds.
-#
-# For example to require at least 3 slaves with a lag <= 10 seconds use:
-#
-# min-slaves-to-write 3
-# min-slaves-max-lag 10
-#
-# Setting one or the other to 0 disables the feature.
-#
-# By default min-slaves-to-write is set to 0 (feature disabled) and
-# min-slaves-max-lag is set to 10.
-
-# A Redis master is able to list the address and port of the attached
-# slaves in different ways. For example the "INFO replication" section
-# offers this information, which is used, among other tools, by
-# Redis Sentinel in order to discover slave instances.
-# Another place where this info is available is in the output of the
-# "ROLE" command of a master.
 #
 # The listed IP and address normally reported by a slave is obtained
 # in the following way:
@@ -282,52 +224,25 @@ slave-priority 100
 
 ################################## SECURITY ###################################
 
-# Require clients to issue AUTH <PASSWORD> before processing any other
-# commands.  This might be useful in environments in which you do not trust
-# others with access to the host running redis-server.
-#
-# This should stay commented out for backward compatibility and because most
-# people do not need auth (e.g. they run their own servers).
-#
-# Warning: since Redis is pretty fast an outside user can try up to
-# 150k passwords per second against a good box. This means that you should
-# use a very strong password otherwise it will be very easy to break.
-#
-# requirepass foobared
+## 4. 安全
 
-# Command renaming.
-#
-# It is possible to change the name of dangerous commands in a shared
-# environment. For instance the CONFIG command may be renamed into something
-# hard to guess so that it will still be available for internal-use tools
-# but not available for general clients.
-#
-# Example:
-#
-# rename-command CONFIG b840fc02d524045429941cc15f59e41cb7be6c52
-#
-# It is also possible to completely kill a command by renaming it into
-# an empty string:
-#
-# rename-command CONFIG ""
-#
-# Please note that changing the name of commands that are logged into the
-# AOF file or transmitted to slaves may cause problems.
+### 4.1 `requirepass foobared`
+给redis设置密码，因为redis快的一逼，一秒钟攻击者能尝试150000的密码，所以你的密码必须非常强壮
+否则很容易被破解。
+### 4.2 `rename-command CONFIG ""和rename-command CONFIG b840fc02d524045429941cc15f59e41cb7be6c52`
+完全杀掉一个命令就用rename-command CONFIG ""
+rename-command CONFIG b840fc02d524045429941cc15f59e41cb7be6c52可以将命令改掉，这样彩笔程序员就不会使用
+危险命令了。
+注意，如果你把命令给改名了，那么从节点什么的都要统一改名字，否则会有问题。
 
-################################### CLIENTS ####################################
-
-# Set the max number of connected clients at the same time. By default
-# this limit is set to 10000 clients, however if the Redis server is not
-# able to configure the process file limit to allow for the specified limit
-# the max number of allowed clients is set to the current file limit
-# minus 32 (as Redis reserves a few file descriptors for internal uses).
-#
-# Once the limit is reached Redis will close all the new connections sending
-# an error 'max number of clients reached'.
-#
-# maxclients 10000
+## 5. 客户端
+### 5.1 `maxclients 10000`
+设置同一时刻的最大客户端数。
+默认值是10000，只要达到最大值，redis会关闭所有新的链接，并且发送一个错误“max number of clients readched”
+给客户端。
 
 ############################## MEMORY MANAGEMENT ################################
+## 6. 内存管理
 
 # Set a memory usage limit to the specified amount of bytes.
 # When the memory limit is reached Redis will try to remove keys
