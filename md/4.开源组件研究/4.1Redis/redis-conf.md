@@ -276,7 +276,7 @@ LRU, LFU and minimal TTL algorithms不是精确的算法，是一个近似的算
 默认的5可以提供不错的结果。你用10会非常接近真实的LRU但是会耗费更多的CPU，用3会更快，但是
 就不那么精确了。
 
-############################# LAZY FREEING ####################################
+
 ## 7. LAZY FREEZING 懒释放
 redis有两个删除key的基本命令。一个是DEL，这是一个阻塞的删除。DEL会让redis停止处理新请求
 ，然后redis会用一种同步的方式去回收DEL要删除的对象的内存。如果这个key对应的是一个非常小的
@@ -290,87 +290,48 @@ FLUSHALL和FLUSHDB，这样可以在后台进行内存回收。这些命令的�
 但是redis本身也会因为一些原因去删除key或flush掉整个内存数据库。
 除了用户主动删除，redis自己去删除key的场景有以下几个：
 
-# Specifically Redis deletes objects independently of a user call in the
-# following scenarios:
-#
-# 1) On eviction, because of the maxmemory and maxmemory policy configurations,
-#    in order to make room for new data, without going over the specified
-#    memory limit.
-# 2) Because of expire: when a key with an associated time to live (see the
-#    EXPIRE command) must be deleted from memory.
-# 3) Because of a side effect of a command that stores data on a key that may
-#    already exist. For example the RENAME command may delete the old key
-#    content when it is replaced with another one. Similarly SUNIONSTORE
-#    or SORT with STORE option may delete existing keys. The SET command
-#    itself removes any old content of the specified key in order to replace
-#    it with the specified string.
-# 4) During replication, when a slave performs a full resynchronization with
-#    its master, the content of the whole database is removed in order to
-#    load the RDB file just transfered.
-#
-# In all the above cases the default is to delete objects in a blocking way,
-# like if DEL was called. However you can configure each case specifically
-# in order to instead release memory in a non-blocking way like if UNLINK
-# was called, using the following configuration directives:
-
+* 内存淘汰(eviction)，设置了内存淘汰策略后，为了给新数据清理空间，需要删除被淘汰的数据，
+	否则内存就爆了。
+* 过期(expire)，当一个key过期时
+* key已经存在时的一些边际影响。例如，set一个已经存在的key，旧的value需要被删除，然后设置新的key。
+* 主从复制时，从节点执行一个全量同步，从节点之前的内存数据需要被flush掉。
+如果你希望上面那四种场景使用异步删除，可以使用如下配置：
+```
 lazyfree-lazy-eviction no
 lazyfree-lazy-expire no
 lazyfree-lazy-server-del no
 slave-lazy-flush no
+```
 
 ############################## APPEND ONLY MODE ###############################
+## 8. AOF
+### 8.1 `appendonly no`
+默认情况下，redis异步的dump内存镜像到磁盘(RDB)。这个模式虽然已经很不错了，但是
+如果在发起dump之前机器宕机，就会丢失一些数据。
+AOF(Append only file)是一种可选的持久化策略提供更好数据安全性。使用默认配置的情况下，
+redis最多丢失一秒钟的写入数据，你甚至可以提高级别，让redis最多丢失一次write操作。
+AOF和RDB持久化可以同时开启。如果开了AOF，redis总会先加载AOF的文件，因为AOF提供更高的可用性。
+### 8.2 `appendfilename "appendonly.aof"`
+aof 文件的名称。
 
-# By default Redis asynchronously dumps the dataset on disk. This mode is
-# good enough in many applications, but an issue with the Redis process or
-# a power outage may result into a few minutes of writes lost (depending on
-# the configured save points).
-#
-# The Append Only File is an alternative persistence mode that provides
-# much better durability. For instance using the default data fsync policy
-# (see later in the config file) Redis can lose just one second of writes in a
-# dramatic event like a server power outage, or a single write if something
-# wrong with the Redis process itself happens, but the operating system is
-# still running correctly.
-#
-# AOF and RDB persistence can be enabled at the same time without problems.
-# If the AOF is enabled on startup Redis will load the AOF, that is the file
-# with the better durability guarantees.
-#
-# Please check http://redis.io/topics/persistence for more information.
+### 8.3 `appendfsync everysec`
+对操作系统的fsync()调用告诉操作系统将output buffer中的缓冲数据写入到磁盘。有些操作系统会
+真正的写磁盘，有一些会尽量去写，也可能会等一下。
+redis 支持三种方式：
+* no: 不去主动调用fsync()，让操作系统自己决定何时写磁盘
+* always：每次write操作之后都调用fsync()，非常慢，但是数据安全性最高。
+* everysec:每秒调用一次fsync()，一个折中的策略。
 
-appendonly no
-
-# The name of the append only file (default: "appendonly.aof")
-
-appendfilename "appendonly.aof"
-
-# The fsync() call tells the Operating System to actually write data on disk
-# instead of waiting for more data in the output buffer. Some OS will really flush
-# data on disk, some other OS will just try to do it ASAP.
-#
-# Redis supports three different modes:
-#
-# no: don't fsync, just let the OS flush the data when it wants. Faster.
-# always: fsync after every write to the append only log. Slow, Safest.
-# everysec: fsync only one time every second. Compromise.
-#
-# The default is "everysec", as that's usually the right compromise between
-# speed and data safety. It's up to you to understand if you can relax this to
-# "no" that will let the operating system flush the output buffer when
-# it wants, for better performances (but if you can live with the idea of
-# some data loss consider the default persistence mode that's snapshotting),
-# or on the contrary, use "always" that's very slow but a bit safer than
-# everysec.
-#
-# More details please check the following article:
-# http://antirez.com/post/redis-persistence-demystified.html
-#
-# If unsure, use "everysec".
-
-# appendfsync always
+默认就是everysec，一般也是推荐的策略，平衡了速度和数据安全性。
+```
+appendfsync always
 appendfsync everysec
-# appendfsync no
-
+appendfsync no
+```
+### 8.4 
+当AOF fsync 策略设置成always或者everysec，而且一个后台的save进程(可能RDB的bgsave进程，也可能是
+AOF rewrite进程)正在执行大量磁盘I/O操作，
+在一些linux配置中，redis可能会对fsync()执行太长的调用。
 # When the AOF fsync policy is set to always or everysec, and a background
 # saving process (a background save or AOF log background rewriting) is
 # performing a lot of I/O against the disk, in some Linux configurations
