@@ -222,10 +222,7 @@ min-slaves-max-lag 10
 # slave-announce-ip 5.5.5.5
 # slave-announce-port 1234
 
-################################## SECURITY ###################################
-
 ## 4. 安全
-
 ### 4.1 `requirepass foobared`
 给redis设置密码，因为redis快的一逼，一秒钟攻击者能尝试150000的密码，所以你的密码必须非常强壮
 否则很容易被破解。
@@ -234,71 +231,45 @@ min-slaves-max-lag 10
 rename-command CONFIG b840fc02d524045429941cc15f59e41cb7be6c52可以将命令改掉，这样彩笔程序员就不会使用
 危险命令了。
 注意，如果你把命令给改名了，那么从节点什么的都要统一改名字，否则会有问题。
-
 ## 5. 客户端
 ### 5.1 `maxclients 10000`
 设置同一时刻的最大客户端数。
 默认值是10000，只要达到最大值，redis会关闭所有新的链接，并且发送一个错误“max number of clients readched”
 给客户端。
-
-############################## MEMORY MANAGEMENT ################################
 ## 6. 内存管理
+### 6.1 maxmemory <bytes>
+设置一个内存的最大值。当内存达到最大值之后，redis会按照选择的内存淘汰策略去删除key。
+如果redis根据淘汰策略无法删除key，或者淘汰策略是noeviction，客户端发送写请求时redis会开始返回报错，并且不会使用
+更多的内存。但是读请求还是会继续支持的。
+注意，如果你有很多从节点，那么内存设置不能太大，否则从节点发起全量同步时，output buffer占用的内存也在这个
+maxmemory的范围内，例如，最大值配的是4GB，如果内存已经3G了，此时一个从节点发起全量同步，outputbuffer你设置的是2G
+这样内存直接就满了，然后就要开始淘汰key，这肯定不是我们想要的。
+### 6.2 `maxmemory-policy noeviction`
+内存淘汰策略，决定了当redis内存满时如何删除key。
+默认值是noeviction。
 
-# Set a memory usage limit to the specified amount of bytes.
-# When the memory limit is reached Redis will try to remove keys
-# according to the eviction policy selected (see maxmemory-policy).
-#
-# If Redis can't remove keys according to the policy, or if the policy is
-# set to 'noeviction', Redis will start to reply with errors to commands
-# that would use more memory, like SET, LPUSH, and so on, and will continue
-# to reply to read-only commands like GET.
-#
-# This option is usually useful when using Redis as an LRU or LFU cache, or to
-# set a hard memory limit for an instance (using the 'noeviction' policy).
-#
-# WARNING: If you have slaves attached to an instance with maxmemory on,
-# the size of the output buffers needed to feed the slaves are subtracted
-# from the used memory count, so that network problems / resyncs will
-# not trigger a loop where keys are evicted, and in turn the output
-# buffer of slaves is full with DELs of keys evicted triggering the deletion
-# of more keys, and so forth until the database is completely emptied.
-#
-# In short... if you have slaves attached it is suggested that you set a lower
-# limit for maxmemory so that there is some free RAM on the system for slave
-# output buffers (but this is not needed if the policy is 'noeviction').
-#
-# maxmemory <bytes>
+* volatile-lru -> 在过期key中使用近似LRU驱逐
+* allkeys-lru -> 在所有key中使用近似LRU
+* volatile-lfu -> 在过期key中使用近似LFU驱逐
+* allkeys-lfu -> 在所有key中使用近似LFU
+* volatile-random -> 在过期key中随机删除一个
+* allkeys-random -> 在所有的key中随机删除一个
+* volatile-ttl -> 谁快过期就删谁
+* noeviction -> 不删除任何key，直接返回报错
 
-# MAXMEMORY POLICY: how Redis will select what to remove when maxmemory
-# is reached. You can select among five behaviors:
-#
-# volatile-lru -> Evict using approximated LRU among the keys with an expire set.
-# allkeys-lru -> Evict any key using approximated LRU.
-# volatile-lfu -> Evict using approximated LFU among the keys with an expire set.
-# allkeys-lfu -> Evict any key using approximated LFU.
-# volatile-random -> Remove a random key among the ones with an expire set.
-# allkeys-random -> Remove a random key, any key.
-# volatile-ttl -> Remove the key with the nearest expire time (minor TTL)
-# noeviction -> Don't evict anything, just return an error on write operations.
-#
-# LRU means Least Recently Used
-# LFU means Least Frequently Used
-#
-# Both LRU, LFU and volatile-ttl are implemented using approximated
-# randomized algorithms.
-#
-# Note: with any of the above policies, Redis will return an error on write
-#       operations, when there are no suitable keys for eviction.
-#
-#       At the date of writing these commands are: set setnx setex append
-#       incr decr rpush lpush rpushx lpushx linsert lset rpoplpush sadd
-#       sinter sinterstore sunion sunionstore sdiff sdiffstore zadd zincrby
-#       zunionstore zinterstore hset hsetnx hmset hincrby incrby decrby
-#       getset mset msetnx exec sort
-#
-# The default is:
-#
-# maxmemory-policy noeviction
+ LRU means Least Recently Used
+ LFU means Least Frequently Used
+
+LRU, LFU and volatile-ttl 基于近似随机算法实现。
+注意，使用上述策略时，如果没有合适的key去删除时，redis在处理写请求时都会返回报错。
+
+At the date of writing these commands are: set setnx setex append
+incr decr rpush lpush rpushx lpushx linsert lset rpoplpush sadd
+sinter sinterstore sunion sunionstore sdiff sdiffstore zadd zincrby
+zunionstore zinterstore hset hsetnx hmset hincrby incrby decrby
+getset mset msetnx exec sort。
+
+
 
 # LRU, LFU and minimal TTL algorithms are not precise algorithms but approximated
 # algorithms (in order to save memory), so you can tune it for speed or
