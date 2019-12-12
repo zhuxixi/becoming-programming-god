@@ -269,40 +269,27 @@ sinter sinterstore sunion sunionstore sdiff sdiffstore zadd zincrby
 zunionstore zinterstore hset hsetnx hmset hincrby incrby decrby
 getset mset msetnx exec sort。
 
-
-
-# LRU, LFU and minimal TTL algorithms are not precise algorithms but approximated
-# algorithms (in order to save memory), so you can tune it for speed or
-# accuracy. For default Redis will check five keys and pick the one that was
-# used less recently, you can change the sample size using the following
-# configuration directive.
-#
-# The default of 5 produces good enough results. 10 Approximates very closely
-# true LRU but costs more CPU. 3 is faster but not very accurate.
-#
-# maxmemory-samples 5
+### 6.3 `maxmemory-samples 5`
+LRU, LFU and minimal TTL algorithms不是精确的算法，是一个近似的算法(主要为了节省内存)，
+所以你可以自己权衡速度和精确度。默认redis会检查5个key，选择一个最近最少使用的key，你可以
+改变这个数量。
+默认的5可以提供不错的结果。你用10会非常接近真实的LRU但是会耗费更多的CPU，用3会更快，但是
+就不那么精确了。
 
 ############################# LAZY FREEING ####################################
+## 7. LAZY FREEZING 懒释放
+redis有两个删除key的基本命令。一个是DEL，这是一个阻塞的删除。DEL会让redis停止处理新请求
+，然后redis会用一种同步的方式去回收DEL要删除的对象的内存。如果这个key对应的是一个非常小的
+对象，那么DEL的执行时间会非常短，接近O(1)或者O(log n)。不过，如果key对应的对象很大,redis
+就会阻塞很长时间来完成这个命令。
+鉴于上述的问题，redis也提供了非阻塞删除命令，例如UNLINK(非阻塞的DEL)和异步的删除策略：
+FLUSHALL和FLUSHDB，这样可以在后台进行内存回收。这些命令的执行时间都是常量时间。一个新的线程
+会在后台渐进的删除并释放内存。
 
-# Redis has two primitives to delete keys. One is called DEL and is a blocking
-# deletion of the object. It means that the server stops processing new commands
-# in order to reclaim all the memory associated with an object in a synchronous
-# way. If the key deleted is associated with a small object, the time needed
-# in order to execute the DEL command is very small and comparable to most other
-# O(1) or O(log_N) commands in Redis. However if the key is associated with an
-# aggregated value containing millions of elements, the server can block for
-# a long time (even seconds) in order to complete the operation.
-#
-# For the above reasons Redis also offers non blocking deletion primitives
-# such as UNLINK (non blocking DEL) and the ASYNC option of FLUSHALL and
-# FLUSHDB commands, in order to reclaim memory in background. Those commands
-# are executed in constant time. Another thread will incrementally free the
-# object in the background as fast as possible.
-#
-# DEL, UNLINK and ASYNC option of FLUSHALL and FLUSHDB are user-controlled.
-# It's up to the design of the application to understand when it is a good
-# idea to use one or the other. However the Redis server sometimes has to
-# delete keys or flush the whole database as a side effect of other operations.
+上面说的那些命令都是用户执行的，具体用哪种命令，取决于用户的场景。
+但是redis本身也会因为一些原因去删除key或flush掉整个内存数据库。
+除了用户主动删除，redis自己去删除key的场景有以下几个：
+
 # Specifically Redis deletes objects independently of a user call in the
 # following scenarios:
 #
