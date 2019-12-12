@@ -330,14 +330,9 @@ appendfsync no
 ```
 ### 8.4 
 当AOF fsync 策略设置成always或者everysec，而且一个后台的save进程(可能RDB的bgsave进程，也可能是
-AOF rewrite进程)正在执行大量磁盘I/O操作，
-在一些linux配置中，redis可能会对fsync()执行太长的调用。
-# When the AOF fsync policy is set to always or everysec, and a background
-# saving process (a background save or AOF log background rewriting) is
-# performing a lot of I/O against the disk, in some Linux configurations
-# Redis may block too long on the fsync() call. Note that there is no fix for
-# this currently, as even performing fsync in a different thread will block
-# our synchronous write(2) call.
+AOF rewrite进程)正在执行大量磁盘I/O操作，在一些linux配置中，redis可能会对fsync()执行太长的调用。
+这个问题目前没什么办法修复，也就是说就算起一个后台进程去做fsync，如果之前已经有进程再做fsync了，后来的调用
+会被阻塞
 #
 # In order to mitigate this problem it's possible to use the following option
 # that will prevent fsync() from being called in the main process while a
