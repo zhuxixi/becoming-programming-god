@@ -328,36 +328,25 @@ appendfsync always
 appendfsync everysec
 appendfsync no
 ```
-### 8.4 
+### 8.4 `no-appendfsync-on-rewrite no`
 当AOF fsync 策略设置成always或者everysec，而且一个后台的save进程(可能RDB的bgsave进程，也可能是
 AOF rewrite进程)正在执行大量磁盘I/O操作，在一些linux配置中，redis可能会对fsync()执行太长的调用。
 这个问题目前没什么办法修复，也就是说就算起一个后台进程去做fsync，如果之前已经有进程再做fsync了，后来的调用
-会被阻塞
-#
-# In order to mitigate this problem it's possible to use the following option
-# that will prevent fsync() from being called in the main process while a
-# BGSAVE or BGREWRITEAOF is in progress.
-#
-# This means that while another child is saving, the durability of Redis is
-# the same as "appendfsync none". In practical terms, this means that it is
-# possible to lose up to 30 seconds of log in the worst scenario (with the
-# default Linux settings).
-#
-# If you have latency problems turn this to "yes". Otherwise leave it as
-# "no" that is the safest pick from the point of view of durability.
+会被阻塞。
+为了缓和这个问题，可以使用下面的配置，当已经有BGSAVE和BGREWRITEAOF在做fsync()时，就不要再起新进程
+了。
+如果已经有子进程在做bgsave或者其他的磁盘操作时，redis无法继续写aof文件，等同于appendsync none。
+在实际情况中，这意味着可能会丢失多达30秒的日志。也就是说，这是会丢数据的，如果对数据及其敏感，要注意这个问题。
+如果你有延迟类问题，可以设置成yes,否则设置为no，这样能保证数据的安全性最高，极少丢数据。
 
-no-appendfsync-on-rewrite no
+### 8.5 `auto-aof-rewrite-percentage 100和auto-aof-rewrite-min-size 64mb`
+自动重写aof文件。当aof文件增大到某个百分比时，redis会重写aof文件。
+redis会记住上次rewrite后aof文件的大小（如果启动后还没发生过rewrite，那么会使用aof原始大小）。
+这个size大小会和当前aof文件的size大小做比较。如果当前size大于指定的百分比，就做rewrite。
+并且，还要指定最小的size，如果当前aof文件小于最小size，不会触发rewrite，这是为了防止文件其实很小，但是
+已经符合增长百分比时的多余的rewrite操作。
 
-# Automatic rewrite of the append only file.
-# Redis is able to automatically rewrite the log file implicitly calling
-# BGREWRITEAOF when the AOF log size grows by the specified percentage.
-#
-# This is how it works: Redis remembers the size of the AOF file after the
-# latest rewrite (if no rewrite has happened since the restart, the size of
-# the AOF at startup is used).
-#
-# This base size is compared to the current size. If the current size is
-# bigger than the specified percentage, the rewrite is triggered. Also
+ Also
 # you need to specify a minimal size for the AOF file to be rewritten, this
 # is useful to avoid rewriting the AOF file even if the percentage increase
 # is reached but it is still pretty small.
