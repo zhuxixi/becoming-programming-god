@@ -345,18 +345,8 @@ redis会记住上次rewrite后aof文件的大小（如果启动后还没发生�
 这个size大小会和当前aof文件的size大小做比较。如果当前size大于指定的百分比，就做rewrite。
 并且，还要指定最小的size，如果当前aof文件小于最小size，不会触发rewrite，这是为了防止文件其实很小，但是
 已经符合增长百分比时的多余的rewrite操作。
-
- Also
-# you need to specify a minimal size for the AOF file to be rewritten, this
-# is useful to avoid rewriting the AOF file even if the percentage increase
-# is reached but it is still pretty small.
-#
-# Specify a percentage of zero in order to disable the automatic AOF
-# rewrite feature.
-
-auto-aof-rewrite-percentage 100
-auto-aof-rewrite-min-size 64mb
-
+如果指定percentage为0代表禁用aof rewrite功能
+### 8.6 `aof-load-truncated yes`
 # An AOF file may be found to be truncated at the end during the Redis
 # startup process, when the AOF data gets loaded back into memory.
 # This may happen when the system where Redis is running
