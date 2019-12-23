@@ -195,7 +195,7 @@ min-slaves-to-write 3
 min-slaves-max-lag 10
 ```
 将这两个配置任意一个设置为0，就禁用此功能。默认是禁用的。
-### 3.20 ``
+### 3.20 `slave-announce-ip 5.5.5.5` 和 `slave-announce-port 1234`
 有多种方式可以显示主节点当前在线的从节点的ip和端口。
 例如，info replication 部分，或者在主节点执行ROLE命令。
 
@@ -419,43 +419,20 @@ cluster node 超时时间是一个节点无响应的最长毫秒数。大多数�
 在多数据中心的场景下，这个配置会比较有用，我们希望某一个数据中心永远都不要升级为主节点，
 否则主节点就漂移到别的数据中心了，这可能挺麻烦的。
 
-########################## CLUSTER DOCKER/NAT support  ########################
-## 11. 
-# In certain deployments, Redis Cluster nodes address discovery fails, because
-# addresses are NAT-ted or because ports are forwarded (the typical case is
-# Docker and other containers).
-#
-# In order to make Redis Cluster working in such environments, a static
-# configuration where each node knows its public address is needed. The
-# following two options are used for this scope, and are:
-#
-# * cluster-announce-ip
-# * cluster-announce-port
-# * cluster-announce-bus-port
-#
-# Each instruct the node about its address, client port, and cluster message
-# bus port. The information is then published in the header of the bus packets
-# so that other nodes will be able to correctly map the address of the node
-# publishing the information.
-#
-# If the above options are not used, the normal Redis Cluster auto-detection
-# will be used instead.
-#
-# Note that when remapped, the bus port may not be at the fixed offset of
-# clients port + 10000, so you can specify any port and bus-port depending
-# on how they get remapped. If the bus-port is not set, a fixed offset of
-# 10000 will be used as usually.
-#
-# Example:
-#
-# cluster-announce-ip 10.1.1.5
-# cluster-announce-port 6379
-# cluster-announce-bus-port 6380
+## 11. CLUSTER DOCKER/NAT 支持
+### 11.1 集群主动告知ip
+在一些特定的部署场景下，redis cluster 节点地址自动发现会失败，因为地址被NAT了，或者端口
+被转发了(Docker容器中)。
+为了让redis cluster在这种环境下正常工作，需要静态配置地址和端口，具体配置如下：
+* cluster-announce-ip 10.10.10.10
+* cluster-announce-port 6379
+* cluster-announce-bus-port 6380
+如果配置文件中没有上述配置项，那么redis cluster会使用标准的自动发现机制。
+## 12. SLOW LOG
+### 12.1 
+redis slow log是系统记录慢操作的，只要超过了给定的时间，都会记录。
 
-################################## SLOW LOG ###################################
-
-# The Redis Slow Log is a system to log queries that exceeded a specified
-# execution time. The execution time does not include the I/O operations
+The execution time does not include the I/O operations
 # like talking with the client, sending the reply and so forth,
 # but just the time needed to actually execute the command (this is the only
 # stage of command execution where the thread is blocked and can not serve
