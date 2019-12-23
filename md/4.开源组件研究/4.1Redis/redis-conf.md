@@ -255,7 +255,7 @@ maxmemory的范围内，例如，最大值配的是4GB，如果内存已经3G了
 * volatile-random -> 在过期key中随机删除一个
 * allkeys-random -> 在所有的key中随机删除一个
 * volatile-ttl -> 谁快过期就删谁
-* noeviction -> 不删除任何key，直接返回报错
+* noeviction -> 不删除任何key，磁盘满了直接返回报错
 
  LRU means Least Recently Used
  LFU means Least Frequently Used
@@ -346,49 +346,30 @@ redis会记住上次rewrite后aof文件的大小（如果启动后还没发生�
 并且，还要指定最小的size，如果当前aof文件小于最小size，不会触发rewrite，这是为了防止文件其实很小，但是
 已经符合增长百分比时的多余的rewrite操作。
 如果指定percentage为0代表禁用aof rewrite功能
-### 8.6 `aof-load-truncated yes`
-# An AOF file may be found to be truncated at the end during the Redis
-# startup process, when the AOF data gets loaded back into memory.
-# This may happen when the system where Redis is running
-# crashes, especially when an ext4 filesystem is mounted without the
-# data=ordered option (however this can't happen when Redis itself
-# crashes or aborts but the operating system still works correctly).
-#
-# Redis can either exit with an error when this happens, or load as much
-# data as possible (the default now) and start if the AOF file is found
-# to be truncated at the end. The following option controls this behavior.
-#
-# If aof-load-truncated is set to yes, a truncated AOF file is loaded and
-# the Redis server starts emitting a log to inform the user of the event.
-# Otherwise if the option is set to no, the server aborts with an error
-# and refuses to start. When the option is set to no, the user requires
-# to fix the AOF file using the "redis-check-aof" utility before to restart
-# the server.
-#
-# Note that if the AOF file will be found to be corrupted in the middle
-# the server will still exit with an error. This option only applies when
-# Redis will try to read more data from the AOF file but not enough bytes
-# will be found.
-aof-load-truncated yes
 
-# When rewriting the AOF file, Redis is able to use an RDB preamble in the
-# AOF file for faster rewrites and recoveries. When this option is turned
-# on the rewritten AOF file is composed of two different stanzas:
-#
-#   [RDB file][AOF tail]
-#
-# When loading Redis recognizes that the AOF file starts with the "REDIS"
-# string and loads the prefixed RDB file, and continues loading the AOF
-# tail.
-#
-# This is currently turned off by default in order to avoid the surprise
-# of a format change, but will at some point be used as the default.
-aof-use-rdb-preamble no
+### 8.6 `aof-load-truncated yes`
+当Redis启动时会加载AOF文件将数据还原到内存中，但是有时候这个AOF的文件可能被损坏掉了
+，例如文件末尾是坏的。这种情况一般都是由于redis宕机导致的，尤其是使用ext4文件系统挂载
+时没配置 data=ordered选项。
+在这种情况下，redis可以直接报错，或者尽可能的读取剩余可读的AOF文件。
+
+如果 aof-load-truncated=yes，redis依然会读取这个损坏的aof文件，但是会打出一个报错日志，
+通知用户。
+如果 aof-load-truncated=no，redis就会报错并拒绝启动服务，用户需要使用redis-check-aof工具
+修复aof文件，再启动redis。
+如果redis运行时aof文件崩溃，redis依然会报错并退出。这个选项救不了这种情况。
+### 8.7 `aof-use-rdb-preamble no`
+当redis重写aof文件时，redis可以先读一个rdb来加快重写的速度，当这个选项打开时，重写的aof文件由
+两部分组成：rdb文件+aof文件。
+当redis启动时加载的aof文件以 "REDIS"开头，就会加载rdb文件，然后再读取剩余的AOF文件。
+默认这个选项是关闭的，
+
 
 ################################ LUA SCRIPTING  ###############################
+## 9. LUA脚本
+### 9.1 `lua-time-limit 5000`
+表示一个lua脚本的最大执行毫秒数。
 
-# Max execution time of a Lua script in milliseconds.
-#
 # If the maximum execution time is reached Redis will log that a script is
 # still in execution after the maximum allowed time and will start to
 # reply to queries with an error.
