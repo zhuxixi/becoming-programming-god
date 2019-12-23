@@ -302,8 +302,6 @@ lazyfree-lazy-expire no
 lazyfree-lazy-server-del no
 slave-lazy-flush no
 ```
-
-############################## APPEND ONLY MODE ###############################
 ## 8. AOF
 ### 8.1 `appendonly no`
 默认情况下，redis异步的dump内存镜像到磁盘(RDB)。这个模式虽然已经很不错了，但是
@@ -365,98 +363,45 @@ redis会记住上次rewrite后aof文件的大小（如果启动后还没发生�
 默认这个选项是关闭的，
 
 
-################################ LUA SCRIPTING  ###############################
 ## 9. LUA脚本
 ### 9.1 `lua-time-limit 5000`
 表示一个lua脚本的最大执行毫秒数。
+如果执行时间达到了最大时间，redis会log这个脚本已经超时了，并且会报个error。
+当一个脚本执行超时，只有`SCRIPT KILL`和`SHUTDOWN NOSAVE`命令是可用的。第一个命令可以去
+停止一个不包含写命令的脚本。第二个命令是唯一一个可以停掉超时写命令的脚本。
+将lua-time-limit设置成0或负数表示你不限制执行时间，并且不会有任何警告。
 
-# If the maximum execution time is reached Redis will log that a script is
-# still in execution after the maximum allowed time and will start to
-# reply to queries with an error.
-#
-# When a long running script exceeds the maximum execution time only the
-# SCRIPT KILL and SHUTDOWN NOSAVE commands are available. The first can be
-# used to stop a script that did not yet called write commands. The second
-# is the only way to shut down the server in the case a write command was
-# already issued by the script but the user doesn't want to wait for the natural
-# termination of the script.
-#
-# Set it to 0 or a negative value for unlimited execution without warnings.
-lua-time-limit 5000
+## 10. Redis Cluster
 
-################################ REDIS CLUSTER  ###############################
-#
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# WARNING EXPERIMENTAL: Redis Cluster is considered to be stable code, however
-# in order to mark it as "mature" we need to wait for a non trivial percentage
-# of users to deploy it in production.
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#
-# Normal Redis instances can't be part of a Redis Cluster; only nodes that are
-# started as cluster nodes can. In order to start a Redis instance as a
-# cluster node enable the cluster support uncommenting the following:
-#
-# cluster-enabled yes
+### 10.1 `cluster-enabled yes`
+普通的redis实例无法成为cluster的一员的；只有node可以。想要将节点加入redis cluster
+，需要想cluster-enabled设置为yes
+### 10.2 `cluster-config-file nodes-6379.conf`
+所有cluster node都有一个cluster配置文件。这个文件不是为了人工编辑的，是redis自己创建的。
+每个redis-node都要使用不同的cluster配置文件。一定要确保运行在同一个系统中的多个redis
+cluster节点使用的是不同的redis配置文件，不要互相覆盖。
+### 10.3 `cluster-node-timeout 15000`
+cluster node 超时时间是一个节点无响应的最长毫秒数。大多数超时时间限制都是这个值的倍数。
+### 10.4 `cluster-slave-validity-factor 10`
+一个主节点宕机后，如果它的从节点A数据太旧(长期处于未同步状态)，那么A不会触发failover，
+它不会升为主。
+没有一个简单方式去策略一个从节点的“数据年龄”，下面提供了两种方式来评估从节点的数据是否过
+老：
+* 如果有多个从节点都可以failover，他们会交换信息选出一个拥有最大复制offset的从节点(这说明
+ 这个节点从主节点那里复制了更多的数据)。各个从节点会计算各自的offset级别，在开始failover之前
+ 会延迟一段时间，具体多久取决于他们的offset级别。
+* 每个从节点计算上次和主节点交互的时间。这个交互可以是最后一次ping操作，或者是主节点推送过来的写命令
+，再或者是上次和主节点断开的时间。如果上次交互时间已经过去太久了，这个从节点就根本不会发起failover。
+第二点用户可以自行调整。如果一个从节点和主节点上次交互时间大于`(node-timeout * slave-validity-factor) + repl-ping-slave-period`
+，从节点就不会发生failover。
+例如，如果node-timeout=30秒，slave-validity-factor=10，repl-ping-slave-period=10秒，
+如果从节点与主节点上次交互时间已经过去了310秒，那么从节点就不会做failover。
+调大slave-validity-factor会允许从节点持有过旧的数据时提升为主节点，调小这个值可能会
+导致从节点永远都无法升为主节点。
+考虑最高的可用性，可以将`slave-validity-factor`设置为0，这样从节点会忽略和主节点的上次
+交互时间，永远都会尝试去做failover。(但是依然会做延迟选举的操作)
 
-# Every cluster node has a cluster configuration file. This file is not
-# intended to be edited by hand. It is created and updated by Redis nodes.
-# Every Redis Cluster node requires a different cluster configuration file.
-# Make sure that instances running in the same system do not have
-# overlapping cluster configuration file names.
-#
-# cluster-config-file nodes-6379.conf
-
-# Cluster node timeout is the amount of milliseconds a node must be unreachable
-# for it to be considered in failure state.
-# Most other internal time limits are multiple of the node timeout.
-#
-# cluster-node-timeout 15000
-
-# A slave of a failing master will avoid to start a failover if its data
-# looks too old.
-#
-# There is no simple way for a slave to actually have an exact measure of
-# its "data age", so the following two checks are performed:
-#
-# 1) If there are multiple slaves able to failover, they exchange messages
-#    in order to try to give an advantage to the slave with the best
-#    replication offset (more data from the master processed).
-#    Slaves will try to get their rank by offset, and apply to the start
-#    of the failover a delay proportional to their rank.
-#
-# 2) Every single slave computes the time of the last interaction with
-#    its master. This can be the last ping or command received (if the master
-#    is still in the "connected" state), or the time that elapsed since the
-#    disconnection with the master (if the replication link is currently down).
-#    If the last interaction is too old, the slave will not try to failover
-#    at all.
-#
-# The point "2" can be tuned by user. Specifically a slave will not perform
-# the failover if, since the last interaction with the master, the time
-# elapsed is greater than:
-#
-#   (node-timeout * slave-validity-factor) + repl-ping-slave-period
-#
-# So for example if node-timeout is 30 seconds, and the slave-validity-factor
-# is 10, and assuming a default repl-ping-slave-period of 10 seconds, the
-# slave will not try to failover if it was not able to talk with the master
-# for longer than 310 seconds.
-#
-# A large slave-validity-factor may allow slaves with too old data to failover
-# a master, while a too small value may prevent the cluster from being able to
-# elect a slave at all.
-#
-# For maximum availability, it is possible to set the slave-validity-factor
-# to a value of 0, which means, that slaves will always try to failover the
-# master regardless of the last time they interacted with the master.
-# (However they'll always try to apply a delay proportional to their
-# offset rank).
-#
-# Zero is the only value able to guarantee that when all the partitions heal
-# the cluster will always be able to continue.
-#
-# cluster-slave-validity-factor 10
-
+### 10.5 
 # Cluster slaves are able to migrate to orphaned masters, that are masters
 # that are left without working slaves. This improves the cluster ability
 # to resist to failures as otherwise an orphaned master can't be failed over
