@@ -401,54 +401,26 @@ cluster node 超时时间是一个节点无响应的最长毫秒数。大多数�
 考虑最高的可用性，可以将`slave-validity-factor`设置为0，这样从节点会忽略和主节点的上次
 交互时间，永远都会尝试去做failover。(但是依然会做延迟选举的操作)
 
-### 10.5 
-# Cluster slaves are able to migrate to orphaned masters, that are masters
-# that are left without working slaves. This improves the cluster ability
-# to resist to failures as otherwise an orphaned master can't be failed over
-# in case of failure if it has no working slaves.
-#
-# Slaves migrate to orphaned masters only if there are still at least a
-# given number of other working slaves for their old master. This number
-# is the "migration barrier". A migration barrier of 1 means that a slave
-# will migrate only if there is at least 1 other working slave for its master
-# and so forth. It usually reflects the number of slaves you want for every
-# master in your cluster.
-#
-# Default is 1 (slaves migrate only if their masters remain with at least
-# one slave). To disable migration just set it to a very large value.
-# A value of 0 can be set but is useful only for debugging and dangerous
-# in production.
-#
-# cluster-migration-barrier 1
-
-# By default Redis Cluster nodes stop accepting queries if they detect there
-# is at least an hash slot uncovered (no available node is serving it).
-# This way if the cluster is partially down (for example a range of hash slots
-# are no longer covered) all the cluster becomes, eventually, unavailable.
-# It automatically returns available as soon as all the slots are covered again.
-#
-# However sometimes you want the subset of the cluster which is working,
-# to continue to accept queries for the part of the key space that is still
-# covered. In order to do so, just set the cluster-require-full-coverage
-# option to no.
-#
-# cluster-require-full-coverage yes
-
-# This option, when set to yes, prevents slaves from trying to failover its
-# master during master failures. However the master can still perform a
-# manual failover, if forced to do so.
-#
-# This is useful in different scenarios, especially in the case of multiple
-# data center operations, where we want one side to never be promoted if not
-# in the case of a total DC failure.
-#
-# cluster-slave-no-failover no
-
-# In order to setup your cluster make sure to read the documentation
-# available at http://redis.io web site.
+### 10.5 `cluster-migration-barrier 1`
+从节点可以迁移至孤儿主节点(这种主节点没有从节点)。
+从节点只有在原来的主节点最少有N个从节点时才会迁移到其他的孤儿主节点，这个给定的数字N
+就是migration-barrier，也叫迁移临界点。migration barrier=1代表，主节点如果有2个从节点，
+当集群中出现孤儿主节点时，其中一个从节点可以被迁移过去。
+想要禁止从节点迁移可以将这个值设置成很大的值，例如999。
+只有在debug模式才可以将这个值设置为0，生产环境别乱设置。
+### 10.6 `cluster-require-full-coverage yes`
+默认情况下，redis cluster在发现还有最少1个hash slot没有被分配时会禁止查询操作。
+这样的话，如果cluster出现部分宕机时，整个集群就不可用了。只有在其他的hash slot都被
+分配才可以。
+你可能会需要cluster的子集可以继续提供服务，要想这样，只要设置`cluster-require-full-coverage no`即可
+### 10.7 `cluster-slave-no-failover no`
+这个选项如果设置为yes，在主节点宕机是，从节点永远都不会升为主。但是主节点依然可以执行
+常规的failover。
+在多数据中心的场景下，这个配置会比较有用，我们希望某一个数据中心永远都不要升级为主节点，
+否则主节点就漂移到别的数据中心了，这可能挺麻烦的。
 
 ########################## CLUSTER DOCKER/NAT support  ########################
-
+## 11. 
 # In certain deployments, Redis Cluster nodes address discovery fails, because
 # addresses are NAT-ted or because ports are forwarded (the typical case is
 # Docker and other containers).
