@@ -429,52 +429,27 @@ cluster node 超时时间是一个节点无响应的最长毫秒数。大多数�
 * cluster-announce-bus-port 6380
 如果配置文件中没有上述配置项，那么redis cluster会使用标准的自动发现机制。
 ## 12. SLOW LOG
-### 12.1 
+### 12.1 `slowlog-log-slower-than 10000`和`slowlog-max-len 128`
 redis slow log是系统记录慢操作的，只要超过了给定的时间，都会记录。
-
-The execution time does not include the I/O operations
-# like talking with the client, sending the reply and so forth,
-# but just the time needed to actually execute the command (this is the only
-# stage of command execution where the thread is blocked and can not serve
-# other requests in the meantime).
-#
-# You can configure the slow log with two parameters: one tells Redis
-# what is the execution time, in microseconds, to exceed in order for the
-# command to get logged, and the other parameter is the length of the
-# slow log. When a new command is logged the oldest one is removed from the
-# queue of logged commands.
-
-# The following time is expressed in microseconds, so 1000000 is equivalent
-# to one second. Note that a negative number disables the slow log, while
-# a value of zero forces the logging of every command.
-slowlog-log-slower-than 10000
-
-# There is no limit to this length. Just be aware that it will consume memory.
-# You can reclaim memory used by the slow log with SLOWLOG RESET.
-slowlog-max-len 128
+执行时间不包括I/O操作的时间。
+你可以通过两个参数来配置slow log：
+* slowlog-log-slower-than 10000:单位是微秒，1000000等于1秒
+* slowlog-max-len 128：slow长度，如果命令大于128，老的那个就没了，这个值没有限制，如果设置太大会占内存
+可以通过SLOWLOG RESET命令来重置这个队列。
 
 ################################ LATENCY MONITOR ##############################
 
-# The Redis latency monitoring subsystem samples different operations
-# at runtime in order to collect data related to possible sources of
-# latency of a Redis instance.
-#
-# Via the LATENCY command this information is available to the user that can
-# print graphs and obtain reports.
-#
-# The system only logs operations that were performed in a time equal or
-# greater than the amount of milliseconds specified via the
-# latency-monitor-threshold configuration directive. When its value is set
-# to zero, the latency monitor is turned off.
-#
-# By default latency monitoring is disabled since it is mostly not needed
-# if you don't have latency issues, and collecting data has a performance
-# impact, that while very small, can be measured under big load. Latency
-# monitoring can easily be enabled at runtime using the command
-# "CONFIG SET latency-monitor-threshold <milliseconds>" if needed.
-latency-monitor-threshold 0
+## 13. LATENCY MONITOR
+### 13.1 `latency-monitor-threshold 0`
+redis 延迟监控系统会在运行时抽样一部分命令来帮助用户分析redis卡顿的原因。
+通过`LATENCY`命令可以打印一些视图和报告。
+redis只会记录那些大于设定毫秒数的命令。
+如果要关闭这个功能，就将`latency-monitor-threshold`设置为0。
+默认情况下monitor是关闭的，没有延迟问题不要一直开着monitor，因为开这个功能可能会对性能有很大影响。
+在运行时也可以开这个功能，执行这个命令即可：`CONFIG SET latency-monitor-threshold <milliseconds>`
 
 ############################# EVENT NOTIFICATION ##############################
+## 14. 事件通知
 
 # Redis can notify Pub/Sub clients about events happening in the key space.
 # This feature is documented at http://redis.io/topics/notifications
