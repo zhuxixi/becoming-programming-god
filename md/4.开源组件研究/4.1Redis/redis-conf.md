@@ -509,108 +509,51 @@ set也支持内部优化，当set内部元素都是64位以下的十进制整数
 HyperLogLog稀疏表示字节限制。这个限制包括16字节的header。当HyperLogLog使用稀疏表示时，如果
 达到了这个限制，它将会转换成紧凑表示。
 这个值设置成大于16000是没意义的，因为16000时用紧凑表示对内存会更友好。
-推荐的值是0~3000
-#
-# The suggested value is ~ 3000 in order to have the benefits of
-# the space efficient encoding without slowing down too much PFADD,
-# which is O(N) with the sparse encoding. The value can be raised to
-# ~ 10000 when CPU is not a concern, but space is, and the data set is
-# composed of many HyperLogLogs with cardinality in the 0 - 15000 range.
-hll-sparse-max-bytes 3000
+推荐的值是0~3000，这样可以布降低PFADD命令的执行时间时还能节省空间。如果内存空间相对cpu资源更紧张，
+，可以将这个值提升到10000。
 
-# Active rehashing uses 1 millisecond every 100 milliseconds of CPU time in
-# order to help rehashing the main Redis hash table (the one mapping top-level
-# keys to values). The hash table implementation Redis uses (see dict.c)
-# performs a lazy rehashing: the more operation you run into a hash table
-# that is rehashing, the more rehashing "steps" are performed, so if the
-# server is idle the rehashing is never complete and some more memory is used
-# by the hash table.
-#
-# The default is to use this millisecond 10 times every second in order to
-# actively rehash the main dictionaries, freeing memory when possible.
-#
-# If unsure:
-# use "activerehashing no" if you have hard latency requirements and it is
-# not a good thing in your environment that Redis can reply from time to time
-# to queries with 2 milliseconds delay.
-#
-# use "activerehashing yes" if you don't have such hard requirements but
-# want to free memory asap when possible.
-activerehashing yes
+### 15.7 `activerehashing yes`
+动态rehash使用每100毫秒中的1毫秒来主动为Redis哈希表做rehash操作。Redis的哈希表实现默认使用
+一种lazy rehash模式：你对hash表的操作越多，越多rehash步骤会被执行，所以如果服务在空闲状态下，
+rehash操作永远都不会结束，而且hash表会占用更多的内存。
+默认会每秒做10次动态rehash来释放内存。
 
-# The client output buffer limits can be used to force disconnection of clients
-# that are not reading data from the server fast enough for some reason (a
-# common reason is that a Pub/Sub client can't consume messages as fast as the
-# publisher can produce them).
-#
-# The limit can be set differently for the three different classes of clients:
-#
-# normal -> normal clients including MONITOR clients
-# slave  -> slave clients
-# pubsub -> clients subscribed to at least one pubsub channel or pattern
-#
-# The syntax of every client-output-buffer-limit directive is the following:
-#
-# client-output-buffer-limit <class> <hard limit> <soft limit> <soft seconds>
-#
-# A client is immediately disconnected once the hard limit is reached, or if
-# the soft limit is reached and remains reached for the specified number of
-# seconds (continuously).
-# So for instance if the hard limit is 32 megabytes and the soft limit is
-# 16 megabytes / 10 seconds, the client will get disconnected immediately
-# if the size of the output buffers reach 32 megabytes, but will also get
-# disconnected if the client reaches 16 megabytes and continuously overcomes
-# the limit for 10 seconds.
-#
-# By default normal clients are not limited because they don't receive data
-# without asking (in a push way), but just after a request, so only
-# asynchronous clients may create a scenario where data is requested faster
-# than it can read.
-#
-# Instead there is a default limit for pubsub and slave clients, since
-# subscribers and slaves receive data in a push fashion.
-#
-# Both the hard or the soft limit can be disabled by setting them to zero.
+### 15.8 客户端传输缓冲区相关配置
+client output buffer限制是用来强制断开client连接的，当client没有及时将缓冲区的数据读取完
+时，redis会认为这个client可能出现宕机，就会断掉连接。
+
+这个限制可以根据三种不同的情况去设置：
+* normal -> 一般的clients包括MONITOR client
+* slave  -> 从节点 clients
+* pubsub -> pub/sub clients
+设置语法如下：
+`client-output-buffer-limit <class> <hard limit> <soft limit> <soft seconds>`
+* hard limit:如果缓冲区的数据达到了hard limit的值，redis直接断开和这个客户端的连接
+* soft limit & soft seconds:如果缓冲区的数据达到了soft limit的值，redis和这个client的连接还会保留soft seconds
+
+默认情况下normal的clients不会有这个限制，因为normal的clients获取数据都是先执行个命令，不存在
+redis主动给normal推送数据的情况。
+如果设置三个0代表无限制，永远不断连接。
+但是这样可能会撑爆内存。
+```
 client-output-buffer-limit normal 0 0 0
 client-output-buffer-limit slave 256mb 64mb 60
 client-output-buffer-limit pubsub 32mb 8mb 60
-
-# Client query buffers accumulate new commands. They are limited to a fixed
-# amount by default in order to avoid that a protocol desynchronization (for
-# instance due to a bug in the client) will lead to unbound memory usage in
-# the query buffer. However you can configure it here if you have very special
-# needs, such us huge multi/exec requests or alike.
-#
-# client-query-buffer-limit 1gb
-
-# In the Redis protocol, bulk requests, that are, elements representing single
-# strings, are normally limited ot 512 mb. However you can change this limit
-# here.
-#
-# proto-max-bulk-len 512mb
-
-# Redis calls an internal function to perform many background tasks, like
-# closing connections of clients in timeout, purging expired keys that are
-# never requested, and so forth.
-#
-# Not all tasks are performed with the same frequency, but Redis checks for
-# tasks to perform according to the specified "hz" value.
-#
-# By default "hz" is set to 10. Raising the value will use more CPU when
-# Redis is idle, but at the same time will make Redis more responsive when
-# there are many keys expiring at the same time, and timeouts may be
-# handled with more precision.
-#
-# The range is between 1 and 500, however a value over 100 is usually not
-# a good idea. Most users should use the default of 10 and raise this up to
-# 100 only in environments where very low latency is required.
-hz 10
-
-# When a child rewrites the AOF file, if the following option is enabled
-# the file will be fsync-ed every 32 MB of data generated. This is useful
-# in order to commit the file to the disk more incrementally and avoid
-# big latency spikes.
-aof-rewrite-incremental-fsync yes
+```
+### 15.9 `client-query-buffer-limit 1gb`
+client query buffer缓冲新的命令。默认使用一个固定数量来避免protocol desynchronization。
+### 15.10 `proto-max-bulk-len 512mb`
+redis协议中，大多数的请求，都是string，默认value不会大于512mb，当然，你可以改这个限制。
+### 15.11 `hz 10`
+redis调用一些内部函数来执行很多后台任务，像关闭超时连接，清理从未请求的过期的key等等。
+不是所有的后台任务都使用相同的频率来执行，redis使用hz参数来决定执行任务的频率。
+默认hz是10.提高这个值会在redis空闲时消耗更多的cpu，但是同时也会让redis更主动的清理过期
+key，而且清理超时连接的操作也会更精确。
+这个值的范围是1~500,不过并不推荐设置大于100的值。多数的用户应该使用默认值，或者最多调高到100。
+### 15.12 `aof-rewrite-incremental-fsync yes`
+当子进程重写aof文件是，如果这个功能开启，redis会以每32MB的数据主动提交到文件。这种
+递增提交文件到磁盘可以避免大的延迟尖刺。
+### 15.13 
 
 # Redis LFU eviction (see maxmemory setting) can be tuned. However it is a good
 # idea to start with the default settings and only change them after investigating
