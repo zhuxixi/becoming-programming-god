@@ -447,112 +447,69 @@ redis只会记录那些大于设定毫秒数的命令。
 如果要关闭这个功能，就将`latency-monitor-threshold`设置为0。
 默认情况下monitor是关闭的，没有延迟问题不要一直开着monitor，因为开这个功能可能会对性能有很大影响。
 在运行时也可以开这个功能，执行这个命令即可：`CONFIG SET latency-monitor-threshold <milliseconds>`
-
-############################# EVENT NOTIFICATION ##############################
 ## 14. 事件通知
+### 14.1 `notify-keyspace-events ""`
+当特定的key space有事件发生时，redis 可以通知 pub/sub 客户端。
+如果开启事件通知功能，一个client对key"foo"执行了del操作，通过pub/sub，两条消息会被推送：
+* PUBLISH __keyspace@0__:foo del
+* PUBLISH __keyevent@0__:del foo
+可以选择redis通知的事件级别。所有的级别都被标记为一个单独的字符：
+*  K     Keyspace events, published with __keyspace@<db>__ prefix.
+*  E     Keyevent events, published with __keyevent@<db>__ prefix.
+*  g     Generic commands (non-type specific) like DEL, EXPIRE, RENAME, ...
+*  $     String commands
+*  l     List commands
+*  s     Set commands
+*  h     Hash commands
+*  z     Sorted set commands
+*  x     Expired events (events generated every time a key expires)
+*  e     Evicted events (events generated when a key is evicted for maxmemory)
+*  A     Alias for g$lshzxe, so that the "AKE" string means all the events.
+notify-keyspace-events参数接受多个字符，或者0个字符串。如果将notify-keyspace-events设置为
+空字符串，就等于禁用通知。
 
-# Redis can notify Pub/Sub clients about events happening in the key space.
-# This feature is documented at http://redis.io/topics/notifications
-#
-# For instance if keyspace events notification is enabled, and a client
-# performs a DEL operation on key "foo" stored in the Database 0, two
-# messages will be published via Pub/Sub:
-#
-# PUBLISH __keyspace@0__:foo del
-# PUBLISH __keyevent@0__:del foo
-#
-# It is possible to select the events that Redis will notify among a set
-# of classes. Every class is identified by a single character:
-#
-#  K     Keyspace events, published with __keyspace@<db>__ prefix.
-#  E     Keyevent events, published with __keyevent@<db>__ prefix.
-#  g     Generic commands (non-type specific) like DEL, EXPIRE, RENAME, ...
-#  $     String commands
-#  l     List commands
-#  s     Set commands
-#  h     Hash commands
-#  z     Sorted set commands
-#  x     Expired events (events generated every time a key expires)
-#  e     Evicted events (events generated when a key is evicted for maxmemory)
-#  A     Alias for g$lshzxe, so that the "AKE" string means all the events.
-#
-#  The "notify-keyspace-events" takes as argument a string that is composed
-#  of zero or multiple characters. The empty string means that notifications
-#  are disabled.
-#
-#  Example: to enable list and generic events, from the point of view of the
-#           event name, use:
-#
-#  notify-keyspace-events Elg
-#
-#  Example 2: to get the stream of the expired keys subscribing to channel
-#             name __keyevent@0__:expired use:
-#
-#  notify-keyspace-events Ex
-#
-#  By default all notifications are disabled because most users don't need
-#  this feature and the feature has some overhead. Note that if you don't
-#  specify at least one of K or E, no events will be delivered.
-notify-keyspace-events ""
-
-############################### ADVANCED CONFIG ###############################
-
-# Hashes are encoded using a memory efficient data structure when they have a
-# small number of entries, and the biggest entry does not exceed a given
-# threshold. These thresholds can be configured using the following directives.
+## 15. 高级设置
+### 15.1 ziplist相关配置
+当数据量很少时，哈希值可以使用一种更高效的数据结构。这个阈值可以使用以下的配置来设置：
+```
 hash-max-ziplist-entries 512
 hash-max-ziplist-value 64
+```
+### 15.2 `list-max-ziplist-size -2`
+list也可以使用一种特殊编码方式来节省内存。list底层的数据结构是quicklist，quicklist的每一个
+节点都是一个ziplist，这个参数主要来控制每个ziplist的大小，如果配置正数，
+那么quicklist每个ziplist中的节点数最大不会超过配置的值。
+如果配置负数，就是指定ziplist的长度：
+* -5: max size: 64 Kb  <-- not recommended for normal workloads
+* -4: max size: 32 Kb  <-- not recommended
+* -3: max size: 16 Kb  <-- probably not recommended
+* -2: max size: 8 Kb   <-- good
+* -1: max size: 4 Kb   <-- good 
+配置-2和-1是性能最高的
+### 15.3 `list-compress-depth 0`
+list也可以被压缩。
+list底层是一个双向链表，压缩深度代表除了head和tail节点有多少node不会被压缩。
+head和tail节点是永远都不会被压缩的。
 
-# Lists are also encoded in a special way to save a lot of space.
-# The number of entries allowed per internal list node can be specified
-# as a fixed maximum size or a maximum number of elements.
-# For a fixed maximum size, use -5 through -1, meaning:
-# -5: max size: 64 Kb  <-- not recommended for normal workloads
-# -4: max size: 32 Kb  <-- not recommended
-# -3: max size: 16 Kb  <-- probably not recommended
-# -2: max size: 8 Kb   <-- good
-# -1: max size: 4 Kb   <-- good
-# Positive numbers mean store up to _exactly_ that number of elements
-# per list node.
-# The highest performing option is usually -2 (8 Kb size) or -1 (4 Kb size),
-# but if your use case is unique, adjust the settings as necessary.
-list-max-ziplist-size -2
-
-# Lists may also be compressed.
-# Compress depth is the number of quicklist ziplist nodes from *each* side of
-# the list to *exclude* from compression.  The head and tail of the list
-# are always uncompressed for fast push/pop operations.  Settings are:
-# 0: disable all list compression
-# 1: depth 1 means "don't start compressing until after 1 node into the list,
-#    going from either the head or tail"
-#    So: [head]->node->node->...->node->[tail]
-#    [head], [tail] will always be uncompressed; inner nodes will compress.
-# 2: [head]->[next]->node->node->...->node->[prev]->[tail]
-#    2 here means: don't compress head or head->next or tail->prev or tail,
-#    but compress all nodes between them.
-# 3: [head]->[next]->[next]->node->node->...->node->[prev]->[prev]->[tail]
-# etc.
-list-compress-depth 0
-
-# Sets have a special encoding in just one case: when a set is composed
-# of just strings that happen to be integers in radix 10 in the range
-# of 64 bit signed integers.
-# The following configuration setting sets the limit in the size of the
-# set in order to use this special memory saving encoding.
-set-max-intset-entries 512
-
-# Similarly to hashes and lists, sorted sets are also specially encoded in
-# order to save a lot of space. This encoding is only used when the length and
-# elements of a sorted set are below the following limits:
-zset-max-ziplist-entries 128
-zset-max-ziplist-value 64
-
-# HyperLogLog sparse representation bytes limit. The limit includes the
-# 16 bytes header. When an HyperLogLog using the sparse representation crosses
-# this limit, it is converted into the dense representation.
-#
-# A value greater than 16000 is totally useless, since at that point the
-# dense representation is more memory efficient.
+* 0: 关闭压缩
+* 1: 代表除了head和tail之外所有的内部节点都会被压缩
+    [head]->node->node->...->node->[tail]
+    [head], [tail] 不会被压缩; 内部 nodes 会被压缩.
+* 2: [head]->[next]->node->node->...->node->[prev]->[tail]
+    head 、 head->next 、 tail->prev 和 tail四个节点不会被压缩,
+    他们之间的其他节点会被压缩.
+* 3: [head]->[next]->[next]->node->node->...->node->[prev]->[prev]->[tail]
+以此类推
+### 15.4 `set-max-intset-entries 512`
+set也支持内部优化，当set内部元素都是64位以下的十进制整数时，这个set的底层实现会使用intset，
+当添加的元素大于set-max-intset-entries时，底层实现会由intset转换为dict。
+### 15.5 `zset-max-ziplist-entries 128`和`zset-max-ziplist-value 64`
+当zset内部元素大于128，或者value超过64字节时，zset底层将不再使用ziplist
+### 15.6 `hll-sparse-max-bytes 3000`
+HyperLogLog稀疏表示字节限制。这个限制包括16字节的header。当HyperLogLog使用稀疏表示时，如果
+达到了这个限制，它将会转换成紧凑表示。
+这个值设置成大于16000是没意义的，因为16000时用紧凑表示对内存会更友好。
+推荐的值是0~3000
 #
 # The suggested value is ~ 3000 in order to have the benefits of
 # the space efficient encoding without slowing down too much PFADD,
