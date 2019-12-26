@@ -437,8 +437,6 @@ redis slow log是系统记录慢操作的，只要超过了给定的时间，都
 * slowlog-max-len 128：slow长度，如果命令大于128，老的那个就没了，这个值没有限制，如果设置太大会占内存
 可以通过SLOWLOG RESET命令来重置这个队列。
 
-################################ LATENCY MONITOR ##############################
-
 ## 13. LATENCY MONITOR
 ### 13.1 `latency-monitor-threshold 0`
 redis 延迟监控系统会在运行时抽样一部分命令来帮助用户分析redis卡顿的原因。
@@ -553,62 +551,46 @@ key，而且清理超时连接的操作也会更精确。
 ### 15.12 `aof-rewrite-incremental-fsync yes`
 当子进程重写aof文件是，如果这个功能开启，redis会以每32MB的数据主动提交到文件。这种
 递增提交文件到磁盘可以避免大的延迟尖刺。
-### 15.13 
+### 15.13 LFU调优
+redis lfu淘汰策略可以调优。
+每个key的LFU counter只有8个key，最大值是255，所以redis使用一个基于概率的对数增长算法，
+并不是每次访问key都会counter+1。当一个key被访问后，会按照以下方式去做counter+1:
+1. 在0~1之间生成一个随机数R
+2. 计算概率P=1/(old_value*lfu_log_factor+1)
+3. r<p就counter+1
 
-# Redis LFU eviction (see maxmemory setting) can be tuned. However it is a good
-# idea to start with the default settings and only change them after investigating
-# how to improve the performances and how the keys LFU change over time, which
-# is possible to inspect via the OBJECT FREQ command.
-#
-# There are two tunable parameters in the Redis LFU implementation: the
-# counter logarithm factor and the counter decay time. It is important to
-# understand what the two parameters mean before changing them.
-#
-# The LFU counter is just 8 bits per key, it's maximum value is 255, so Redis
-# uses a probabilistic increment with logarithmic behavior. Given the value
-# of the old counter, when a key is accessed, the counter is incremented in
-# this way:
-#
-# 1. A random number R between 0 and 1 is extracted.
-# 2. A probability P is calculated as 1/(old_value*lfu_log_factor+1).
-# 3. The counter is incremented only if R < P.
-#
-# The default lfu-log-factor is 10. This is a table of how the frequency
-# counter changes with a different number of accesses with different
-# logarithmic factors:
-#
-# +--------+------------+------------+------------+------------+------------+
-# | factor | 100 hits   | 1000 hits  | 100K hits  | 1M hits    | 10M hits   |
-# +--------+------------+------------+------------+------------+------------+
-# | 0      | 104        | 255        | 255        | 255        | 255        |
-# +--------+------------+------------+------------+------------+------------+
-# | 1      | 18         | 49         | 255        | 255        | 255        |
-# +--------+------------+------------+------------+------------+------------+
-# | 10     | 10         | 18         | 142        | 255        | 255        |
-# +--------+------------+------------+------------+------------+------------+
-# | 100    | 8          | 11         | 49         | 143        | 255        |
-# +--------+------------+------------+------------+------------+------------+
-#
-# NOTE: The above table was obtained by running the following commands:
-#
-#   redis-benchmark -n 1000000 incr foo
-#   redis-cli object freq foo
-#
-# NOTE 2: The counter initial value is 5 in order to give new objects a chance
-# to accumulate hits.
-#
-# The counter decay time is the time, in minutes, that must elapse in order
-# for the key counter to be divided by two (or decremented if it has a value
-# less <= 10).
-#
-# The default value for the lfu-decay-time is 1. A Special value of 0 means to
-# decay the counter every time it happens to be scanned.
-#
-# lfu-log-factor 10
-# lfu-decay-time 1
 
-########################### ACTIVE DEFRAGMENTATION #######################
-#
+默认 lfu-log-factor 是 10. 
+下面是不同的factor下的增长速度，可以看到，factor越小增长越快:
+```
+ +--------+------------+------------+------------+------------+------------+
+ | factor | 100 hits   | 1000 hits  | 100K hits  | 1M hits    | 10M hits   |
+ +--------+------------+------------+------------+------------+------------+
+ | 0      | 104        | 255        | 255        | 255        | 255        |
+ +--------+------------+------------+------------+------------+------------+
+ | 1      | 18         | 49         | 255        | 255        | 255        |
+ +--------+------------+------------+------------+------------+------------+
+ | 10     | 10         | 18         | 142        | 255        | 255        |
+ +--------+------------+------------+------------+------------+------------+
+ | 100    | 8          | 11         | 49         | 143        | 255        |
+ +--------+------------+------------+------------+------------+------------+
+
+
+ 注意: 上表结论是执行以下命令得出的:
+
+   redis-benchmark -n 1000000 incr foo
+   redis-cli object freq foo
+
+ 注意 2: counter初始值是5,否则key很快就被淘汰了
+```
+
+lfu-decay-time我还不太理解，等研究透彻后补充
+
+lfu-log-factor 10
+lfu-decay-time 1
+
+## 16. 动态碎片整理(处于试验阶段，暂不翻译)
+```
 # WARNING THIS FEATURE IS EXPERIMENTAL. However it was stress tested
 # even in production and manually tested by multiple engineers for some
 # time.
@@ -668,4 +650,4 @@ key，而且清理超时连接的操作也会更精确。
 
 # Maximal effort for defrag in CPU percentage
 # active-defrag-cycle-max 75
-
+```
