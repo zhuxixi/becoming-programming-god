@@ -62,16 +62,16 @@
 
 ## 10 Garbage-First Garbage Collector Tuning
 ### 10.1 Garbage Collection Phases
-Young Garbage Collections
-Mixed Garbage Collections
-Phases of the Marking Cycle
-Important Defaults
-How to Unlock Experimental VM Flags
-Recommendations
-Overflow and Exhausted Log Messages
-Humongous Objects and Humongous Allocations
-11 Other Considerations
-Finalization and Weak, Soft, and Phantom References
-Explicit Garbage Collection
-Soft References
-Class Metadata
+### 10.2 Young Garbage Collections
+### 10.3 Mixed Garbage Collections
+### 10.4 Phases of the Marking Cycle
+### 10.5 Important Defaults
+### 10.6 How to Unlock Experimental VM Flags
+### 10.7 Recommendations
+### 10.8 Overflow and Exhausted Log Messages
+### 10.9 Humongous Objects and Humongous Allocations
+## 11 Other Considerations
+### 11.1 Finalization and Weak, Soft, and Phantom References
+### 11.2 Explicit Garbage Collection
+### 11.3 Soft References
+### 11.4 Class Metadata
