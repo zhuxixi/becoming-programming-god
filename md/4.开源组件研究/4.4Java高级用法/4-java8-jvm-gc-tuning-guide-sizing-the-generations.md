@@ -42,6 +42,7 @@
 如果survivor区太小，复制回收时多出来的对象会直接进tenured generation。如果survivor区太大，会造成空间浪费。每次回收时，jvm会选择一个阈值，这个值是一个对象进入tenured区之前的复制次数。这个值最好能刚好让2个survivor区中的一个是满的。如果这个值太小，可能survivor没满对象就进老年代了，如果太大，直接就进老年代了。`-XX:+PrintTenuringDistribution`参数(不是所有的回收器都提供)可以显示young区中对象的复制阈值。如果要观察对象的分布图，这个参数也是很有用的。
 
 下表提供了64 bit Solaris的默认参数：
+
 |Parameter    |Server JVM Default Value|
 |:-------:    |:----------------------:|
 |NewRatio     |2                       |
