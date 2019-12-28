@@ -54,11 +54,11 @@ young区的最大值会根据heap size和NewRatio参数来计算。当然了，�
 
 下面几条是服务端应用的建议：
 * 先决定你能给JVM多少heap。再划出应用性能和young区大小关系曲线，寻找最佳的设置。
-		* 注意heap size一定要比物理机内存小，否则会有问题。
+	* 注意heap size一定要比物理机内存小，否则会有问题。
 * 如果heap size是固定的，那么提高young区大小会降低tenured区大小。要保证tenured区足够大，在程序任意时刻都能够装下所有的存活对象，此外，还要提供20%左右的额外空间。
 
 > 我要是能做到上面那一点，那这世界上还会有OOM吗？
 
 * Subject to the previously stated constraint on the tenured generation:(这句话我没理解)
-		* 给young区足够的空间。
-		* 提升young区时也提高cpu核数，因为可以并行分配内存 
+	* 给young区足够的空间。
+	* 提升young区时也提高cpu核数，因为可以并行分配内存 
