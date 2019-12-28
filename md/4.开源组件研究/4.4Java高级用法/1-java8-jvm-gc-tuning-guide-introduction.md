@@ -8,7 +8,7 @@ Java程序有大有小，从小的桌面程序到大型工业级服务端应用�
 
 阿姆达尔定律表明很多工作量无法没完美的并行化；有些工作本身就是串行的，没有办法使用并行化来加速执行。Java也是如此。尤其是，java 1.4的jvm没有平行回收器，所以回收器在多处理器系统上的性能提升是相对的，不一定并发收集就特别好。
 下图说明了gc时间消耗与cpu核数的关系，这是一个理想模型。每条线都代表一个Java程序，这条线后面的N%GC表示它在单核CPU的情况下花费多少时间去做GC，例如红色的线表示这个应用在单核CPU的系统上运行时只花费1%的时间来做垃圾回收。但是当系统CPU核数扩展到32时，它就需要花费20%以上的时间去做GC了，也就是说扩展CPU核数(使用并行计算)并不能提高程序的吞吐量。再看品红的那条线，单核时使用30%的时间去做GC，但是提升到32核时吞吐量已经不足15%，性能下降的十分剧烈。
-![Comparing Percentage of Time Spent in Garbage Collection](comparing-percentage-of-time-spent-in-garbage-collection.png)
+![Comparing Percentage of Time Spent in Garbage Collection](1-comparing-percentage-of-time-spent-in-garbage-collection.png)
 
 这表示一个小问题在系统扩展后可能会被放大成整个系统的瓶颈(不知道阿里的JDK是不是做了优化)。这也说明你的参数调优在大型系统的场景下会有很大的性能提升，这是很有必要的。所以对于大型Java应用，有必要去选择正确的垃圾回收器并对参数进行调优。
 
