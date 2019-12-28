@@ -70,6 +70,7 @@
 ### 10.7 Recommendations
 ### 10.8 Overflow and Exhausted Log Messages
 ### 10.9 Humongous Objects and Humongous Allocations
+
 ## 11 Other Considerations
 ### 11.1 Finalization and Weak, Soft, and Phantom References
 ### 11.2 Explicit Garbage Collection
