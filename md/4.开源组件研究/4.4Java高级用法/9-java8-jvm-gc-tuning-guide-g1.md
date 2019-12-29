@@ -38,3 +38,5 @@ G1是计划用来替代CMS的。将G1与CMS进行比较，可以发现G1要比CM
 
 G1暂停应用程序，将活动对象复制到新区域。这些停顿可以是只收集年轻区域的young gc停顿，也可以是young区和tenured区的混合收集停顿。与CMS一样，当应用程序停止时，会有一个final mark 或 remark 停顿来完成标记阶段。CMS有initial mark pause，G1将initial mark pause作为evacuation pause的一部分。G1在收集末尾会有一个清理阶段，部分是STW，部分是并发的。G1在清理阶段的STW部分去识别空的region和tenured区域的region，为下一次收集做准备。
 
+## Card Tables and Concurrent Phases
+
