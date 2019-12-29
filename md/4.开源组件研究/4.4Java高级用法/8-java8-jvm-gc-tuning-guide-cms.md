@@ -1,4 +1,4 @@
-# Concurrent Mark Sweep (CMS) Collector CMS收集器
+# 8 Concurrent Mark Sweep (CMS) Collector CMS收集器
 
 启用CMS收集器使用参数`-XX:+UseConcMarkSweepGC`
 
