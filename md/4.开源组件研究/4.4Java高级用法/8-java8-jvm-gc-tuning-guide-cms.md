@@ -51,3 +51,65 @@ CMS收集器可以在以递增的方式完成并发阶段。回想一下，在�
 通常，CMS收集器在整个并发跟踪阶段使用一个或多个处理器，而不会主动放弃它们。类似地，在整个并发清除阶段使用一个处理器，同样不放弃它。这些开销对于一个有响应时间限制的应用来说，可能太大了，尤其是那种运行在单核或者双核的物理机服务。Incremental Mode通过将并发阶段拆解成分布在minor gc之间的多个部分来解决这个问题。(通过Thread.yield方法交还CPU让应用程序线程获得执行机会)
 
 i-cms模式在CMS放弃处理器资源之前使用duty cycle来控制并发阶段的工作量。duty cycle是两次minor gc的之间允许CMS回收器工作的时间百分比。i-cms模式可以根据应用程序的行为(推荐的方法，称为自动步调)自动计算duty cycle，duty cycle也可以通过参数来设置。
+
+## Command-Line Options 命令行选项
+下表是ims的命令行参数：
+|Option                  |Description               |Java5之前的默认值|Java6之后的默认值|
+|:-------:               |-------:                  |:-------:       |:-------:       |
+|-XX:+CMSIncrementalMode |开启增量模式,同时也会开启CMS|        禁用     |       禁用     |
+|-XX:CMSIncrementalPacing|开启自动步长，duty cycle会自动调整|禁用       |禁用            |
+|-XX:CMSIncrementalDutyCycle=<N>|minor gc之间cms的执行时间百分比，如果设置了pacing,那么这个参数就是初始值|50|10|
+|-XX:CMSIncrementalDutyCycleMin=<N>|开启pacing后duty cycle的下界|10|0|
+|-XX:CMSIncrementalSafetyFactor=<N>|计算duty cycle时稳定增加的百分比|10|10|
+|-XX:CMSIncrementalOffset=<N>|duty cycle右移的百分比|0|0|
+|-XX:CMSExpAvgFactor=<N>|对当前样本数量加权的百分比|25|25|
+
+## Recommended Options
+Java 8 要使用i-cms，使用下面的命令行参数:
+```
+-XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode \
+-XX:+PrintGCDetails -XX:+PrintGCTimeStamps
+```
+后面两个参数就是打日志用的，可以后期分析GC行为。
+
+## Basic Troubleshooting 基本的问题定位
+
+i-cms自动步长特性在程序运行期间收集各项指标来计算duty cycle，这样并发收集可以在heap被填满之前完成。但是，通过过去的行为也不能一直预测外来的行为，这个预估可能也不会那么精确。如果发生了过多的GC，可以根据下表来进行调优:
+|Step|Options|
+|:---:|:----:|
+|增加安全系数|-XX:CMSIncrementalSafetyFactor=<N>|
+|增加最小duty cycle|-XX:CMSIncrementalDutyCycleMin=<N>|
+|关闭自动步长，使用固定的duty cycle|-XX:-CMSIncrementalPacing -XX:CMSIncrementalDutyCycle=<N>|
+
+## Measurements 度量
+下面的日志片段是CMS收集器增加参数`-verbose:gc`和`-XX:+PrintGCDetails`后输出的。
+
+注意，CMS收集器的输出与minor gc的输出穿插在一起;通常，许多minor gc发生在并发收集周期中。CMS-initial-mark表示并发收集周期的开始，CMS-concurrent-mark表示并发标记阶段的结束，CMS-concurrent-sweep表示并发清除阶段的结束。之前没有讨论过CMS-concurrent-preclean代表的的预清理阶段。preclean阶段和remark阶段是并发进行的。最后一个阶段是CMS-concurrent-reset，表示正在为下一次并发收集做准备。
+
+```
+[GC [1 CMS-initial-mark: 13991K(20288K)] 14103K(22400K), 0.0023781 secs]
+[GC [DefNew: 2112K->64K(2112K), 0.0837052 secs] 16103K->15476K(22400K), 0.0838519 secs]
+...
+[GC [DefNew: 2077K->63K(2112K), 0.0126205 secs] 17552K->15855K(22400K), 0.0127482 secs]
+[CMS-concurrent-mark: 0.267/0.374 secs]
+[GC [DefNew: 2111K->64K(2112K), 0.0190851 secs] 17903K->16154K(22400K), 0.0191903 secs]
+[CMS-concurrent-preclean: 0.044/0.064 secs]
+[GC [1 CMS-remark: 16090K(20288K)] 17242K(22400K), 0.0210460 secs]
+[GC [DefNew: 2112K->63K(2112K), 0.0716116 secs] 18177K->17382K(22400K), 0.0718204 secs]
+[GC [DefNew: 2111K->63K(2112K), 0.0830392 secs] 19363K->18757K(22400K), 0.0832943 secs]
+...
+[GC [DefNew: 2111K->0K(2112K), 0.0035190 secs] 17527K->15479K(22400K), 0.0036052 secs]
+[CMS-concurrent-sweep: 0.291/0.662 secs]
+[GC [DefNew: 2048K->0K(2112K), 0.0013347 secs] 17527K->15479K(27912K), 0.0014231 secs]
+[CMS-concurrent-reset: 0.016/0.016 secs]
+[GC [DefNew: 2048K->1K(2112K), 0.0013936 secs] 17527K->15479K(27912K), 0.0014814 secs]
+```
+
+相对于minor gc的停顿时间，initial mark停顿时间通常较短。并发阶段(并发标记、并发预清理和并发清理)通常持续的时间明显长于minor gc的停顿时间，如上面的日志所示。但是，请注意，应用程序在这些并发阶段不会停顿，虽然持续时间长，但是注意程序不会停顿。remark造成的停顿时间通常与minor gc停顿时间相当。remark停顿受某些应用程序特征(例如，高频率修改对象引用可能会增加此停顿的持续时间)和上一次minor gc的持续时间(例如，young区的对象越多，停顿时间越长)的影响。
+
+
+
+
+
+
+
