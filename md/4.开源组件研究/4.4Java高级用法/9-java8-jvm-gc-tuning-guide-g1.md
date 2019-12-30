@@ -40,12 +40,17 @@ G1暂停应用程序，将活动对象复制到新区域。这些停顿可以是
 
 ## Card Tables and Concurrent Phases 卡牌表和并发阶段
 
-如果垃圾收集器没有收集整个堆(增量收集)，那么可能会存在一些指针从未收集区域指向正在被收集的区域，就好比在做young gc时，young的一些对象被tenured区的对象引用，垃圾回收器必须要知道这些指针在哪里。这通常适用于分代垃圾收集器，其中堆中未收集的部分通常是tenured区，而堆中收集的部分是young区。用于保存这些信息的数据结构(tenured的指针指向young的对象)被称为remenmbered set。JVM使用一个字节数组来表示一个Card Table。每个字节对应一个Card。一个Card对应于堆中的一段地址范围。弄脏卡意味着将字节的值改为脏值;脏值可能包含一个从tenured区到young区对象的指针。
+如果垃圾收集器没有收集整个堆，那么heap对于收集器来说，是有分区的，在这种情况下，可能会存在一些指针从未收集区域指向正在被收集的区域的对象，就好比在做young gc时，young的一些对象被tenured区的对象引用，垃圾回收器必须要知道这些指针在哪里，暂且我们将这种指针叫做跨区指针，跨区指针是很烦的，因为它的存在，可能会导致young区的一些对象是无法被收集的。对于分代的垃圾收集器来说，这是非常典型的场景，其中堆中未收集的部分通常是tenured区，而堆中收集的部分是young区。用于保存这些指针的数据结构(tenured的指针指向young的对象)被称为remenmbered set(记忆集合)。Card Table是一种特殊类型的remembered set。JVM使用一个字节数组来表示一个Card Table。每个Byte字节对应一个Card。一个Card对应堆中的一段地址范围。Dirtying a card意味着将字节的值改为脏值;脏值可能包含一个跨区指针。
 
-Processing a card代表查看这个card是否包含tenured区到young区的指针，如果有的话，会做一些处理，例如将这个数据结构转换成其他的数据结构。
+Processing a card代表查看这个card是否包含跨区指针，如果有的话，会做一些处理，例如将这个数据结构转换成其他的数据结构。
 
-G1包含一个并发标记阶段，会标记应用中所有已发现的活跃对象。并发标记从疏散暂停结束(初始标记工作在此完成)延伸到remark阶段。并发清理阶段将集合清空的区域添加到空闲区域列表中，并在remember set中清除这些区域。此外，并发细化线程根据需要运行，以处理被应用程序写操作弄脏的、可能具有跨区域引用的card table entry。
+G1包含一个并发标记阶段，会标记应用中所有已发现的活跃对象。并发标记从疏散暂停结束(初始标记工作在此完成)直到remark阶段。并发清理阶段将GC后清空的region添加到free region列表中，并在remember set中清除这些区域。此外，并发细化线程根据需要去处理被应用程序写操作弄脏的、可能具有跨区指针的card table entry。
 
 ## Starting a Concurrent Collection Cycle 启动一次并发收集循环
 
-如前所述，young和old区域都是试用混合收集的垃圾收集。为了收集tenured区，G1对堆中的活动对象进行全部标记。这种标记由并发标记阶段完成。当整个Java堆的占用达到参数initiatingheap佔有人百分比的值时，将启动并发标记阶段。使用命令行选项-XX设置此参数的值:initiatingheap占用百分比=<NN>。initiatingheap佔有率的默认值是45。
+如前所述，G1使用混合收集来收集young和old区域。为了收集tenured区，G1对堆中的活动对象进行全部标记。这种标记由并发标记阶段完成。当整个Java heap的使用率达到参数`-XX:InitiatingHeapOccupancyPercent=<NN>`设定的值时就会触发并发标记阶段。这个参数的默认值是45。
+
+## Pause Time Goal 停顿时间目标
+
+通过参数`MaxGCPauseMillis`来给G1收集器指定停顿时间目标。G1使用预测模型来估算停顿时间内可以做多少回收工作。在一次gc结束时，G1选择下次将要回收的region(collection set---GC集合)。GC集合会包括young区。在一定程度上，G1通过选择集合中young区的数量来控制GC停顿时间。与其他垃圾收集器一样，你可以通过参数指定young区的大小，但是这样做可能会影响G1达到停顿时间目标的效果。除了停顿时间目标之外，还可以指定停顿的间隔时长。
+停顿的间隔时长可以通过参数`GCPauseIntervalMillis`指定，默认是0；`MaxGCPauseMillis`默认是200毫秒。
