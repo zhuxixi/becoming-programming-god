@@ -38,7 +38,10 @@ G1是计划用来替代CMS的。将G1与CMS进行比较，可以发现G1要比CM
 
 G1暂停应用程序，将活动对象复制到新区域。这些停顿可以是只收集年轻区域的young gc停顿，也可以是young区和tenured区的混合收集停顿。与CMS一样，当应用程序停止时，会有一个final mark 或 remark 停顿来完成标记阶段。CMS有initial mark pause，G1将initial mark pause作为evacuation pause的一部分。G1在收集末尾会有一个清理阶段，部分是STW，部分是并发的。G1在清理阶段的STW部分去识别空的region和tenured区域的region，为下一次收集做准备。
 
-## Card Tables and Concurrent Phases
+## Card Tables and Concurrent Phases 卡牌表和并发阶段
 
-如果垃圾收集器没有收集整个堆(增量收集)，那么可能会存在一些指针从未收集区域指向正在被收集的区域，就好比在做young gc时，young的一些对象被tenured区的对象引用，垃圾回收器必须要知道这些指针在哪里。这通常适用于分代垃圾收集器，其中堆中未收集的部分通常是tenured区，而堆中收集的部分是young区。用于保存这些信息的数据结构(tenured的指针指向young的对象)被称为remenmbered set。JVM使用一个字节数组来表示一个Card Table。每个字节对应一个Card。一个Card对应于堆中的一段地址范围。弄脏卡意味着将字节的值改为脏值;脏值可能包含从老一代到年轻一代的地址范围内的新指针。
+如果垃圾收集器没有收集整个堆(增量收集)，那么可能会存在一些指针从未收集区域指向正在被收集的区域，就好比在做young gc时，young的一些对象被tenured区的对象引用，垃圾回收器必须要知道这些指针在哪里。这通常适用于分代垃圾收集器，其中堆中未收集的部分通常是tenured区，而堆中收集的部分是young区。用于保存这些信息的数据结构(tenured的指针指向young的对象)被称为remenmbered set。JVM使用一个字节数组来表示一个Card Table。每个字节对应一个Card。一个Card对应于堆中的一段地址范围。弄脏卡意味着将字节的值改为脏值;脏值可能包含一个从tenured区到young区对象的指针。
 
+Processing a card代表查看这个card是否包含tenured区到young区的指针，如果有的话，会做一些处理，例如将这个数据结构转换成其他的数据结构。
+
+G1包含一个并发标记阶段，会标记应用中所有已发现的活跃对象。并发标记从疏散暂停结束(初始标记工作在此完成)延伸到remark阶段。并发清理阶段将集合清空的区域添加到空闲区域列表中，并在remember set中清除这些区域。此外，并发细化线程根据需要运行，以处理被应用程序写操作弄脏的、可能具有跨区域引用的卡片表条目。
